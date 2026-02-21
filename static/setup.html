@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Initial Setup - Web Platform</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .setup-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .setup-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+
+        .setup-header h1 {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .setup-header p {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        .setup-icon {
+            width: 80px;
+            height: 80px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            font-size: 40px;
+        }
+
+        .setup-body {
+            padding: 40px 30px;
+        }
+
+        .step-indicator {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 30px;
+            gap: 10px;
+        }
+
+        .step {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #e0e0e0;
+            transition: all 0.3s ease;
+        }
+
+        .step.active {
+            background: #667eea;
+            width: 40px;
+            border-radius: 6px;
+        }
+
+        .step.completed {
+            background: #4caf50;
+        }
+
+        .setup-step {
+            display: none;
+        }
+
+        .setup-step.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .step-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .step-description {
+            color: #666;
+            margin-bottom: 25px;
+            line-height: 1.6;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        label .required {
+            color: #f44336;
+        }
+
+        input[type="text"],
+        input[type="email"],
+        input[type="password"] {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 15px;
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+        }
+
+        input.error {
+            border-color: #f44336;
+        }
+
+        .error-message {
+            color: #f44336;
+            font-size: 13px;
+            margin-top: 6px;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        .password-strength {
+            margin-top: 10px;
+        }
+
+        .strength-bar {
+            height: 6px;
+            background: #e0e0e0;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-bottom: 6px;
+        }
+
+        .strength-fill {
+            height: 100%;
+            width: 0;
+            transition: all 0.3s ease;
+            border-radius: 3px;
+        }
+
+        .strength-weak { background: #f44336; width: 33%; }
+        .strength-medium { background: #ff9800; width: 66%; }
+        .strength-strong { background: #4caf50; width: 100%; }
+
+        .strength-text {
+            font-size: 13px;
+            color: #666;
+        }
+
+        .password-requirements {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 13px;
+        }
+
+        .requirement {
+            padding: 4px 0;
+            color: #666;
+        }
+
+        .requirement i {
+            width: 20px;
+            display: inline-block;
+        }
+
+        .requirement.met {
+            color: #4caf50;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 30px;
+        }
+
+        button {
+            flex: 1;
+            padding: 14px 24px;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: #f5f5f5;
+            color: #666;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .info-box i {
+            color: #2196f3;
+            margin-right: 10px;
+        }
+
+        .success-icon {
+            width: 100px;
+            height: 100px;
+            background: #4caf50;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            font-size: 50px;
+            color: white;
+            animation: scaleIn 0.5s ease;
+        }
+
+        @keyframes scaleIn {
+            from {
+                transform: scale(0);
+            }
+            to {
+                transform: scale(1);
+            }
+        }
+
+        .completion-message {
+            text-align: center;
+        }
+
+        .completion-message h2 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .completion-message p {
+            color: #666;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        .loading-spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="setup-container">
+        <div class="setup-header">
+            <div class="setup-icon">
+                <i class="bi bi-gear-fill"></i>
+            </div>
+            <h1>Welcome to Web Platform</h1>
+            <p>Let's set up your administrator account</p>
+        </div>
+
+        <div class="setup-body">
+            <!-- Step Indicator -->
+            <div class="step-indicator">
+                <div class="step active" data-step="1"></div>
+                <div class="step" data-step="2"></div>
+                <div class="step" data-step="3"></div>
+            </div>
+
+            <!-- Step 1: Welcome -->
+            <div class="setup-step active" id="step1">
+                <h2 class="step-title">Getting Started</h2>
+                <p class="step-description">Welcome! This appears to be your first time setting up Web Platform. Let's create your administrator account to get started.</p>
+
+                <div class="info-box">
+                    <i class="bi bi-info-circle-fill"></i>
+                    <strong>What is an admin account?</strong><br>
+                    The admin account has full access to manage users, backups, system settings, and all family trees in the application.
+                </div>
+
+                <div class="button-group">
+                    <button class="btn-primary" onclick="nextStep()">
+                        Get Started <i class="bi bi-arrow-right"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 2: Account Details -->
+            <div class="setup-step" id="step2">
+                <h2 class="step-title">Create Admin Account</h2>
+                <p class="step-description">Enter your details to create the administrator account.</p>
+
+                <form id="setupForm">
+                    <div class="form-group">
+                        <label for="appName">
+                            Application Name <span class="required">*</span>
+                        </label>
+                        <input type="text" id="appName" name="appName" required
+                               placeholder="e.g., Smith Web Platform, Johnson Heritage"
+                               value="Web Platform">
+                        <div class="error-message" id="app-name-error"></div>
+                        <div style="font-size: 13px; color: #666; margin-top: 6px;">
+                            <i class="bi bi-info-circle"></i> This name will appear throughout the application
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="username">
+                            Username <span class="required">*</span>
+                        </label>
+                        <input type="text" id="username" name="username" required
+                               placeholder="Enter a unique username"
+                               autocomplete="username">
+                        <div class="error-message" id="username-error"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="email">
+                            Email Address <span class="required">*</span>
+                        </label>
+                        <input type="email" id="email" name="email" required
+                               placeholder="admin@example.com"
+                               autocomplete="email">
+                        <div class="error-message" id="email-error"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="password">
+                            Password <span class="required">*</span>
+                        </label>
+                        <input type="password" id="password" name="password" required
+                               placeholder="Create a strong password"
+                               autocomplete="new-password">
+                        <div class="error-message" id="password-error"></div>
+
+                        <div class="password-strength" id="passwordStrength" style="display: none;">
+                            <div class="strength-bar">
+                                <div class="strength-fill" id="strengthBar"></div>
+                            </div>
+                            <div class="strength-text" id="strengthText"></div>
+                        </div>
+
+                        <div class="password-requirements">
+                            <div class="requirement" id="req-length">
+                                <i class="bi bi-circle"></i> At least 8 characters
+                            </div>
+                            <div class="requirement" id="req-upper">
+                                <i class="bi bi-circle"></i> One uppercase letter
+                            </div>
+                            <div class="requirement" id="req-lower">
+                                <i class="bi bi-circle"></i> One lowercase letter
+                            </div>
+                            <div class="requirement" id="req-number">
+                                <i class="bi bi-circle"></i> One number
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="confirmPassword">
+                            Confirm Password <span class="required">*</span>
+                        </label>
+                        <input type="password" id="confirmPassword" name="confirmPassword" required
+                               placeholder="Re-enter your password"
+                               autocomplete="new-password">
+                        <div class="error-message" id="confirm-password-error"></div>
+                    </div>
+                </form>
+
+                <div class="button-group">
+                    <button class="btn-secondary" onclick="prevStep()">
+                        <i class="bi bi-arrow-left"></i> Back
+                    </button>
+                    <button class="btn-primary" onclick="validateAndSubmit()" id="createAccountBtn">
+                        Create Account <i class="bi bi-arrow-right"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 3: Success -->
+            <div class="setup-step" id="step3">
+                <div class="completion-message">
+                    <div class="success-icon">
+                        <i class="bi bi-check-lg"></i>
+                    </div>
+                    <h2>Setup Complete!</h2>
+                    <p>Your administrator account has been created successfully. You can now log in and start using Web Platform.</p>
+
+                    <div class="info-box">
+                        <i class="bi bi-shield-check"></i>
+                        Your account has been created with admin privileges. You can manage users, create backups, and access all system features.
+                    </div>
+
+                    <div class="button-group">
+                        <button class="btn-primary" onclick="goToLogin()">
+                            Go to Login <i class="bi bi-box-arrow-in-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentStep = 1;
+        const totalSteps = 3;
+
+        // Password validation
+        document.getElementById('password').addEventListener('input', function(e) {
+            const password = e.target.value;
+            const strengthDiv = document.getElementById('passwordStrength');
+            const strengthBar = document.getElementById('strengthBar');
+            const strengthText = document.getElementById('strengthText');
+
+            if (password.length === 0) {
+                strengthDiv.style.display = 'none';
+                return;
+            }
+
+            strengthDiv.style.display = 'block';
+
+            // Check requirements
+            const requirements = {
+                length: password.length >= 8,
+                upper: /[A-Z]/.test(password),
+                lower: /[a-z]/.test(password),
+                number: /[0-9]/.test(password)
+            };
+
+            // Update requirement indicators
+            document.getElementById('req-length').classList.toggle('met', requirements.length);
+            document.getElementById('req-upper').classList.toggle('met', requirements.upper);
+            document.getElementById('req-lower').classList.toggle('met', requirements.lower);
+            document.getElementById('req-number').classList.toggle('met', requirements.number);
+
+            // Update icons
+            Object.keys(requirements).forEach(req => {
+                const el = document.getElementById(`req-${req}`);
+                const icon = el.querySelector('i');
+                icon.className = requirements[req] ? 'bi bi-check-circle-fill' : 'bi bi-circle';
+            });
+
+            // Calculate strength
+            const metCount = Object.values(requirements).filter(Boolean).length;
+            strengthBar.className = 'strength-fill';
+
+            if (metCount < 2) {
+                strengthBar.classList.add('strength-weak');
+                strengthText.textContent = 'Weak password';
+            } else if (metCount < 4) {
+                strengthBar.classList.add('strength-medium');
+                strengthText.textContent = 'Medium password';
+            } else {
+                strengthBar.classList.add('strength-strong');
+                strengthText.textContent = 'Strong password';
+            }
+        });
+
+        function nextStep() {
+            if (currentStep < totalSteps) {
+                document.getElementById(`step${currentStep}`).classList.remove('active');
+                document.querySelector(`.step[data-step="${currentStep}"]`).classList.add('completed');
+                currentStep++;
+                document.getElementById(`step${currentStep}`).classList.add('active');
+                document.querySelector(`.step[data-step="${currentStep}"]`).classList.add('active');
+            }
+        }
+
+        function prevStep() {
+            if (currentStep > 1) {
+                document.getElementById(`step${currentStep}`).classList.remove('active');
+                document.querySelector(`.step[data-step="${currentStep}"]`).classList.remove('active');
+                currentStep--;
+                document.getElementById(`step${currentStep}`).classList.add('active');
+                document.querySelector(`.step[data-step="${currentStep}"]`).classList.remove('completed');
+            }
+        }
+
+        function validateAndSubmit() {
+            const appName = document.getElementById('appName').value.trim();
+            const username = document.getElementById('username').value.trim();
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+
+            // Clear previous errors
+            document.querySelectorAll('.error-message').forEach(el => {
+                el.classList.remove('show');
+                el.textContent = '';
+            });
+            document.querySelectorAll('input').forEach(el => el.classList.remove('error'));
+
+            let isValid = true;
+
+            // Validate app name
+            if (appName.length < 2) {
+                showError('app-name', 'Application name must be at least 2 characters');
+                isValid = false;
+            } else if (appName.length > 50) {
+                showError('app-name', 'Application name must be 50 characters or less');
+                isValid = false;
+            }
+
+            // Validate username
+            if (username.length < 3) {
+                showError('username', 'Username must be at least 3 characters');
+                isValid = false;
+            }
+
+            // Validate email
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                showError('email', 'Please enter a valid email address');
+                isValid = false;
+            }
+
+            // Validate password
+            if (password.length < 8) {
+                showError('password', 'Password must be at least 8 characters');
+                isValid = false;
+            } else if (!/[A-Z]/.test(password)) {
+                showError('password', 'Password must contain an uppercase letter');
+                isValid = false;
+            } else if (!/[a-z]/.test(password)) {
+                showError('password', 'Password must contain a lowercase letter');
+                isValid = false;
+            } else if (!/[0-9]/.test(password)) {
+                showError('password', 'Password must contain a number');
+                isValid = false;
+            }
+
+            // Validate password confirmation
+            if (password !== confirmPassword) {
+                showError('confirm-password', 'Passwords do not match');
+                isValid = false;
+            }
+
+            if (isValid) {
+                submitSetup(appName, username, email, password);
+            }
+        }
+
+        function showError(fieldName, message) {
+            const errorEl = document.getElementById(`${fieldName}-error`);
+            const inputEl = document.getElementById(fieldName) || document.getElementById('confirmPassword') || document.getElementById('appName');
+            errorEl.textContent = message;
+            errorEl.classList.add('show');
+            inputEl.classList.add('error');
+        }
+
+        async function submitSetup(appName, username, email, password) {
+            const btn = document.getElementById('createAccountBtn');
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading-spinner"></span> Creating account...';
+
+            try {
+                const response = await fetch('/api/admin/setup', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        app_name: appName,
+                        username: username,
+                        email: email,
+                        password: password
+                    })
+                });
+
+                if (response.ok) {
+                    // Success - go to step 3
+                    nextStep();
+                } else {
+                    const error = await response.json();
+                    alert('Setup failed: ' + (error.detail || 'Unknown error'));
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                }
+            } catch (error) {
+                console.error('Setup error:', error);
+                alert('Setup failed: ' + error.message);
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        }
+
+        function goToLogin() {
+            window.location.href = '/static/admin-login.html';
+        }
+
+        // Check if this is actually first run
+        window.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const response = await fetch('/api/admin/check-first-run');
+                const data = await response.json();
+
+                if (!data.is_first_run) {
+                    // Not first run, redirect to login
+                    window.location.href = '/static/admin-login.html';
+                }
+            } catch (error) {
+                console.error('Error checking first run:', error);
+            }
+        });
+    </script>
+</body>
+</html>

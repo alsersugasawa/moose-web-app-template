@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Portal - Web Platform v4.1.0</title>
+    <!-- Bootstrap 5.3 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <!-- Custom Admin Styles -->
+    <link rel="stylesheet" href="/static/admin-styles.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="admin-nav">
+        <div class="nav-brand">
+            <h1>🛡️ Admin Portal</h1>
+        </div>
+        <div class="nav-menu">
+            <a href="#dashboard" class="nav-link active" onclick="showSection('dashboard')">Dashboard</a>
+            <a href="#users" class="nav-link" onclick="showSection('users')">Users</a>
+            <a href="#logs" class="nav-link" onclick="showSection('logs')">Logs</a>
+            <a href="#backups" class="nav-link" onclick="showSection('backups')">Backups</a>
+            <a href="#about" class="nav-link" onclick="showSection('about')">About</a>
+        </div>
+        <div class="nav-user">
+            <div class="theme-switcher">
+                <i class="bi bi-circle-half"></i>
+                <select id="admin-theme-select" onchange="changeTheme(this.value)">
+                    <option value="system">System</option>
+                    <option value="light">Light</option>
+                    <option value="dark">Dark</option>
+                </select>
+            </div>
+            <span id="admin-username"></span>
+            <button onclick="logout()" class="btn-logout">Logout</button>
+        </div>
+    </nav>
+
+    <!-- Dashboard Section -->
+    <div id="dashboard-section" class="content-section active">
+        <div class="section-header">
+            <h2>Dashboard</h2>
+            <p>System overview and statistics</p>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">👥</div>
+                <div class="stat-info">
+                    <h3 id="stat-total-users">0</h3>
+                    <p>Total Users</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">✅</div>
+                <div class="stat-info">
+                    <h3 id="stat-active-users">0</h3>
+                    <p>Active Users (Last 30 days)</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">🌲</div>
+                <div class="stat-info">
+                    <h3 id="stat-web-platforms">0</h3>
+                    <p>Web Platforms</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">👨‍👩‍👧‍👦</div>
+                <div class="stat-info">
+                    <h3 id="stat-family-members">0</h3>
+                    <p>Family Members</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">🌳</div>
+                <div class="stat-info">
+                    <h3 id="stat-tree-views">0</h3>
+                    <p>Saved Views</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">🤝</div>
+                <div class="stat-info">
+                    <h3 id="stat-tree-shares">0</h3>
+                    <p>Tree Shares</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="dashboard-grid">
+            <div class="dashboard-card">
+                <h3><i class="bi bi-cpu"></i> System Resources</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <span class="label"><i class="bi bi-cpu"></i> CPU Usage:</span>
+                        <span id="system-cpu-percent" class="resource-value">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label"><i class="bi bi-speedometer2"></i> CPU Speed:</span>
+                        <span id="system-cpu-speed">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label"><i class="bi bi-cpu-fill"></i> CPU Cores:</span>
+                        <span id="system-cpu-cores">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label"><i class="bi bi-memory"></i> RAM Usage:</span>
+                        <span id="system-memory-percent" class="resource-value">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label"><i class="bi bi-memory"></i> RAM Total:</span>
+                        <span id="system-memory-total">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label"><i class="bi bi-memory"></i> RAM Available:</span>
+                        <span id="system-memory-available">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label"><i class="bi bi-device-hdd"></i> Disk Usage:</span>
+                        <span id="system-disk-percent" class="resource-value">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label"><i class="bi bi-device-hdd"></i> Disk Total:</span>
+                        <span id="system-disk-total">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label"><i class="bi bi-device-hdd-fill"></i> Disk Available:</span>
+                        <span id="system-disk-available">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dashboard-card">
+                <h3><i class="bi bi-info-circle"></i> System Information</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <span class="label">App Version:</span>
+                        <span id="system-version">2.3.0</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">System Uptime:</span>
+                        <span id="system-uptime">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Database Size:</span>
+                        <span id="system-db-size">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Python Version:</span>
+                        <span id="python-version">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Platform:</span>
+                        <span id="system-platform">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Architecture:</span>
+                        <span id="system-arch">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dashboard-card" id="update-card">
+                <h3><i class="bi bi-arrow-repeat"></i> Application Updates</h3>
+                <div style="display: flex; flex-direction: column; gap: 15px;">
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="label">Current Version:</span>
+                            <span id="current-version">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Latest Version:</span>
+                            <span id="latest-version">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Update Status:</span>
+                            <span id="update-status-text">Checking...</span>
+                        </div>
+                    </div>
+                    <div id="update-available-banner" style="display: none; padding: 12px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px; color: #856404;">
+                        <i class="bi bi-exclamation-triangle"></i> <strong>Update Available!</strong>
+                        A new version is ready to install.
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <button id="check-update-btn" onclick="loadAllReleases()" class="btn-secondary" style="flex: 1;">
+                            <i class="bi bi-arrow-clockwise"></i> Check for Updates
+                        </button>
+                    </div>
+
+                    <!-- Available Releases Table -->
+                    <div id="releases-container" style="display: none;">
+                        <h4 style="margin: 20px 0 10px 0; font-size: 16px;">Available Releases</h4>
+                        <div style="overflow-x: auto;">
+                            <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                                <thead>
+                                    <tr style="background: #f5f5f5; border-bottom: 2px solid #ddd;">
+                                        <th style="padding: 10px; text-align: left;">Version</th>
+                                        <th style="padding: 10px; text-align: left;">Release Date</th>
+                                        <th style="padding: 10px; text-align: left;">Status</th>
+                                        <th style="padding: 10px; text-align: center;">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="releases-table-body">
+                                    <!-- Populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div id="update-progress" style="display: none;">
+                        <div style="padding: 12px; background: #e3f2fd; border: 1px solid #2196f3; border-radius: 6px; color: #0d47a1;">
+                            <i class="bi bi-hourglass-split"></i> <strong>Update in Progress...</strong>
+                            <p style="margin: 8px 0 0 0; font-size: 13px;">
+                                A snapshot backup has been created. The application will restart automatically when the update is complete.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dashboard-card">
+                <h3><i class="bi bi-diagram-3"></i> Services Layout</h3>
+                <div class="services-layout">
+                    <div class="service-item" id="service-web">
+                        <div class="service-status status-unknown"></div>
+                        <div class="service-info">
+                            <strong>Web Application</strong>
+                            <small>FastAPI + uvicorn</small>
+                            <span class="service-port">Port: 8000</span>
+                        </div>
+                    </div>
+                    <div class="service-item" id="service-db">
+                        <div class="service-status status-unknown"></div>
+                        <div class="service-info">
+                            <strong>PostgreSQL Database</strong>
+                            <small>postgres:14-alpine</small>
+                            <span class="service-port">Port: 5432</span>
+                        </div>
+                    </div>
+                    <div class="service-item" id="service-uploads">
+                        <div class="service-status status-unknown"></div>
+                        <div class="service-info">
+                            <strong>File Storage</strong>
+                            <small>Static files & uploads</small>
+                            <span class="service-port">Mounted volumes</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dashboard-card">
+                <h3><i class="bi bi-clock-history"></i> Recent Activity</h3>
+                <div id="recent-logs" class="logs-preview"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Users Section -->
+    <div id="users-section" class="content-section">
+        <div class="section-header">
+            <h2>User Management</h2>
+            <button onclick="showCreateUserModal()" class="btn-primary">+ Create User</button>
+        </div>
+
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Username</th>
+                        <th>Email</th>
+                        <th>Admin</th>
+                        <th>Active</th>
+                        <th>Last Login</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="users-table-body">
+                    <tr>
+                        <td colspan="7" class="text-center">Loading...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Logs Section -->
+    <div id="logs-section" class="content-section">
+        <div class="section-header">
+            <h2>System Logs</h2>
+            <div class="filter-group">
+                <select id="log-level-filter" onchange="loadLogs()">
+                    <option value="">All Levels</option>
+                    <option value="INFO">INFO</option>
+                    <option value="WARNING">WARNING</option>
+                    <option value="ERROR">ERROR</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Level</th>
+                        <th>Action</th>
+                        <th>Message</th>
+                        <th>User</th>
+                        <th>IP Address</th>
+                    </tr>
+                </thead>
+                <tbody id="logs-table-body">
+                    <tr>
+                        <td colspan="6" class="text-center">Loading...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Backups Section -->
+    <div id="backups-section" class="content-section">
+        <div class="section-header">
+            <h2>Backup Management</h2>
+            <div>
+                <button onclick="openRestoreBackupModal()" class="btn-secondary" style="margin-right: 10px;">
+                    <i class="bi bi-upload"></i> Restore Backup
+                </button>
+                <button onclick="createBackup()" class="btn-primary">+ Create Backup</button>
+            </div>
+        </div>
+
+        <!-- Backup Destinations Status Panel -->
+        <div id="backup-destinations-panel" class="backup-destinations-panel">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="margin: 0; font-size: 16px; font-weight: 600;">Backup Destinations</h3>
+                <button onclick="openBackupSettingsModal()" class="btn-secondary" style="padding: 6px 12px; font-size: 13px;">
+                    <i class="bi bi-gear"></i> Configure
+                </button>
+            </div>
+            <div id="backup-destinations-content" style="display: flex; gap: 20px; flex-wrap: wrap;">
+                <div class="loading-text">Loading configuration...</div>
+            </div>
+            <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e0e0e0;">
+                <small style="color: #666;">
+                    <strong>Note:</strong> Changes to backup destinations require a container restart to take effect.
+                    You can configure SMB and NFS settings using the Configure button above.
+                </small>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Filename</th>
+                        <th>Type</th>
+                        <th>Size</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="backups-table-body">
+                    <tr>
+                        <td colspan="6" class="text-center">Loading...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- About Section -->
+    <div id="about-section" class="content-section">
+        <div class="section-header">
+            <h2>About Web Platformlication</h2>
+            <p>Software information, security compliance, and licensing details</p>
+        </div>
+
+        <div class="about-container">
+            <!-- Software Information Card -->
+            <div class="about-card">
+                <div class="about-card-icon">📦</div>
+                <h3>Software Information</h3>
+                <div class="about-details">
+                    <div class="about-detail-row">
+                        <span class="detail-label">Version:</span>
+                        <span class="detail-value">4.0.0</span>
+                    </div>
+                    <div class="about-detail-row">
+                        <span class="detail-label">Release Date:</span>
+                        <span class="detail-value">January 2026</span>
+                    </div>
+                    <div class="about-detail-row">
+                        <span class="detail-label">Build:</span>
+                        <span class="detail-value">Production</span>
+                    </div>
+                    <div class="about-detail-row">
+                        <span class="detail-label">Platform:</span>
+                        <span class="detail-value">FastAPI + PostgreSQL</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Security Compliance Card -->
+            <div class="about-card">
+                <div class="about-card-icon">🔒</div>
+                <h3>Security Compliance</h3>
+                <div class="about-details">
+                    <div class="compliance-badge">
+                        <strong>ISO 27001:2013</strong>
+                        <span class="compliance-status">✓ Compliant</span>
+                        <p>Information Security Management System</p>
+                    </div>
+                    <div class="compliance-badge">
+                        <strong>NIST SP 800-53 Rev 5</strong>
+                        <span class="compliance-status">✓ Moderate Baseline</span>
+                        <p>Security and Privacy Controls</p>
+                    </div>
+                    <div class="compliance-badge">
+                        <strong>OWASP ASVS 4.0</strong>
+                        <span class="compliance-status">✓ Level 2</span>
+                        <p>Application Security Verification Standard</p>
+                    </div>
+                </div>
+                <div class="about-link">
+                    <a href="/SECURITY_COMPLIANCE.md" target="_blank">
+                        <i class="bi bi-file-text"></i> View Security Compliance Documentation
+                    </a>
+                </div>
+            </div>
+
+            <!-- Copyright & License Card -->
+            <div class="about-card">
+                <div class="about-card-icon">©️</div>
+                <h3>Copyright & License</h3>
+                <div class="about-details">
+                    <div class="about-detail-row">
+                        <span class="detail-label">Copyright:</span>
+                        <span class="detail-value">© 2026 Web Platformlication</span>
+                    </div>
+                    <div class="about-detail-row">
+                        <span class="detail-label">License:</span>
+                        <span class="detail-value">MIT License</span>
+                    </div>
+                    <div class="license-text">
+                        <p>Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software.</p>
+                        <p><strong>THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.</strong></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Security Controls Summary -->
+            <div class="about-card full-width">
+                <div class="about-card-icon">🛡️</div>
+                <h3>Implemented Security Controls</h3>
+                <div class="security-controls-grid">
+                    <div class="security-control">
+                        <i class="bi bi-shield-check"></i>
+                        <strong>Password Policy</strong>
+                        <small>12+ characters, complexity requirements</small>
+                    </div>
+                    <div class="security-control">
+                        <i class="bi bi-shield-check"></i>
+                        <strong>Rate Limiting</strong>
+                        <small>Brute force protection</small>
+                    </div>
+                    <div class="security-control">
+                        <i class="bi bi-shield-check"></i>
+                        <strong>Session Management</strong>
+                        <small>30-minute timeout</small>
+                    </div>
+                    <div class="security-control">
+                        <i class="bi bi-shield-check"></i>
+                        <strong>Security Headers</strong>
+                        <small>HSTS, CSP, X-Frame-Options</small>
+                    </div>
+                    <div class="security-control">
+                        <i class="bi bi-shield-check"></i>
+                        <strong>CORS Whitelisting</strong>
+                        <small>Origin-based access control</small>
+                    </div>
+                    <div class="security-control">
+                        <i class="bi bi-shield-check"></i>
+                        <strong>File Upload Security</strong>
+                        <small>Type and size validation</small>
+                    </div>
+                    <div class="security-control">
+                        <i class="bi bi-shield-check"></i>
+                        <strong>Input Sanitization</strong>
+                        <small>XSS and injection prevention</small>
+                    </div>
+                    <div class="security-control">
+                        <i class="bi bi-shield-check"></i>
+                        <strong>Encrypted Backups</strong>
+                        <small>AES-256 encryption</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create User Modal -->
+    <div id="create-user-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Create New User</h3>
+                <button onclick="closeCreateUserModal()" class="btn-close">&times;</button>
+            </div>
+            <form id="create-user-form" onsubmit="handleCreateUser(event)">
+                <div class="form-group">
+                    <label>Username *</label>
+                    <input type="text" id="new-username" required>
+                </div>
+                <div class="form-group">
+                    <label>Email *</label>
+                    <input type="email" id="new-email" required>
+                </div>
+                <div class="form-group">
+                    <label>Password *</label>
+                    <input type="password" id="new-password" required minlength="6">
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="new-is-admin">
+                        Administrator
+                    </label>
+                </div>
+                <div class="form-actions">
+                    <button type="button" onclick="closeCreateUserModal()" class="btn-secondary">Cancel</button>
+                    <button type="submit" class="btn-primary">Create User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit User Modal -->
+    <div id="edit-user-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit User</h3>
+                <button onclick="closeEditUserModal()" class="btn-close">&times;</button>
+            </div>
+            <form id="edit-user-form" onsubmit="handleEditUser(event)">
+                <input type="hidden" id="edit-user-id">
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="edit-username" disabled>
+                </div>
+                <div class="form-group">
+                    <label>Email *</label>
+                    <input type="email" id="edit-email" required>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="edit-is-admin">
+                        Administrator
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="edit-is-active">
+                        Active
+                    </label>
+                </div>
+                <div class="form-actions">
+                    <button type="button" onclick="closeEditUserModal()" class="btn-secondary">Cancel</button>
+                    <button type="submit" class="btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Create Backup Modal -->
+    <div id="create-backup-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Create New Backup</h3>
+                <button onclick="closeCreateBackupModal()" class="btn-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Backup Type *</label>
+                    <select id="backup-type-select" class="form-control">
+                        <option value="database">Database Only - PostgreSQL dump (.sql)</option>
+                        <option value="config">Configuration Only - App settings & Docker config (.json)</option>
+                        <option value="full">Full Backup - Database + Configuration</option>
+                    </select>
+                    <small style="display: block; margin-top: 5px; color: #666;">
+                        Database backups contain all user data. Configuration backups include app settings, backup config, and Docker files.
+                    </small>
+                </div>
+                <div id="backup-type-info" style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 6px; font-size: 14px;">
+                    <strong>Database Backup includes:</strong>
+                    <ul style="margin: 5px 0 0 20px;">
+                        <li>All users and authentication data</li>
+                        <li>Family trees and members</li>
+                        <li>Tree shares and permissions</li>
+                        <li>System logs and backups metadata</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="button" onclick="closeCreateBackupModal()" class="btn-secondary">Cancel</button>
+                <button type="button" onclick="confirmCreateBackup()" class="btn-primary">Create Backup</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Download Backup Modal -->
+    <div id="download-backup-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Download Backup</h3>
+                <button onclick="closeDownloadBackupModal()" class="btn-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Download backup: <strong id="download-backup-filename"></strong></p>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="encrypt-download-checkbox" onchange="toggleEncryptPassword()">
+                        Encrypt backup with password
+                    </label>
+                </div>
+                <div class="form-group" id="encrypt-password-group" style="display: none;">
+                    <label>Encryption Password *</label>
+                    <input type="password" id="encrypt-password" placeholder="Enter password to encrypt backup">
+                    <small>Remember this password - it will be required to restore this backup!</small>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="button" onclick="closeDownloadBackupModal()" class="btn-secondary">Cancel</button>
+                <button type="button" onclick="confirmDownloadBackup()" class="btn-primary">Download</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Restore Backup Modal -->
+    <div id="restore-backup-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>⚠️ Restore Database Backup</h3>
+                <button onclick="closeRestoreBackupModal()" class="btn-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <strong>Warning:</strong> Restoring a backup will overwrite the current database. A snapshot of the current state will be created automatically, allowing you to roll back if needed.
+                </div>
+                <div class="form-group">
+                    <label>Select Backup File *</label>
+                    <input type="file" id="restore-file" accept=".sql,.encrypted" required>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="create-snapshot-checkbox" checked>
+                        Create snapshot before restoring (Recommended)
+                    </label>
+                    <small style="display: block; margin-top: 5px; color: #666;">A backup of the current database will be created before restoring, allowing you to roll back.</small>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="is-encrypted-checkbox" onchange="toggleDecryptPassword()">
+                        Backup is encrypted
+                    </label>
+                </div>
+                <div class="form-group" id="decrypt-password-group" style="display: none;">
+                    <label>Decryption Password *</label>
+                    <input type="password" id="decrypt-password" placeholder="Enter password to decrypt backup">
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="button" onclick="closeRestoreBackupModal()" class="btn-secondary">Cancel</button>
+                <button type="button" onclick="confirmRestoreBackup()" class="btn-danger">Restore Database</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Backup Settings Modal -->
+    <div id="backup-settings-modal" class="modal">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <h3>Configure Backup Destinations</h3>
+                <button onclick="closeBackupSettingsModal()" class="btn-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <strong>Important:</strong> After saving changes, you must restart the Docker container for the settings to take effect.
+                </div>
+
+                <!-- SMB/CIFS Configuration -->
+                <div style="border: 2px solid #e0e0e0; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
+                        <h4 style="margin: 0; font-size: 15px; font-weight: 600;">🌐 SMB/CIFS File Share</h4>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="smb-enabled">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div id="smb-settings" style="display: none;">
+                        <div class="form-group">
+                            <label>SMB Host/IP *</label>
+                            <input type="text" id="smb-host" placeholder="192.168.1.100 or server.local">
+                        </div>
+                        <div class="form-group">
+                            <label>SMB Share Name *</label>
+                            <input type="text" id="smb-share" placeholder="backups">
+                        </div>
+                        <div class="form-group">
+                            <label>Username *</label>
+                            <input type="text" id="smb-username" placeholder="backup_user">
+                        </div>
+                        <div class="form-group">
+                            <label>Password *</label>
+                            <input type="password" id="smb-password" placeholder="Enter SMB password">
+                            <small style="color: #666;">Leave blank to keep existing password</small>
+                        </div>
+                        <div class="form-group">
+                            <label>Mount Point</label>
+                            <input type="text" id="smb-mount-point" value="/mnt/smb_backups">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- NFS Configuration -->
+                <div style="border: 2px solid #e0e0e0; border-radius: 8px; padding: 20px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
+                        <h4 style="margin: 0; font-size: 15px; font-weight: 600;">📁 NFS File Share</h4>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="nfs-enabled">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div id="nfs-settings" style="display: none;">
+                        <div class="form-group">
+                            <label>NFS Host/IP *</label>
+                            <input type="text" id="nfs-host" placeholder="192.168.1.101 or nfs-server.local">
+                        </div>
+                        <div class="form-group">
+                            <label>NFS Export Path *</label>
+                            <input type="text" id="nfs-export" placeholder="/exports/backups">
+                        </div>
+                        <div class="form-group">
+                            <label>Mount Point</label>
+                            <input type="text" id="nfs-mount-point" value="/mnt/nfs_backups">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="button" onclick="closeBackupSettingsModal()" class="btn-secondary">Cancel</button>
+                <button type="button" onclick="saveBackupSettings()" class="btn-primary">Save Configuration</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5.3 JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Admin JavaScript -->
+    <script src="/static/admin.js"></script>
+</body>
+</html>

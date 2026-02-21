@@ -1,0 +1,35 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: web-platform-ingress
+  namespace: web-platform
+  labels:
+    app: web-platform
+  annotations:
+    # nginx ingress controller annotations
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # cert-manager annotations for automatic TLS
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    # Optional: Rate limiting
+    nginx.ingress.kubernetes.io/limit-rps: "10"
+    # Optional: CORS
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - web-platform.example.com  # Change to your domain
+    secretName: web-platform-tls
+  rules:
+  - host: web-platform.example.com  # Change to your domain
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: web-platform
+            port:
+              number: 80

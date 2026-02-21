@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: web-platform
+  labels:
+    app: web-platform
+data:
+  DATABASE_URL: "postgresql+asyncpg://postgres:postgres@postgres:5432/webapp"
+  TRUSTED_HOSTS: "*"  # Allow all hosts in Kubernetes environment
+  CORS_ORIGINS: "*"  # Allow all origins in Kubernetes environment
+  # Add other non-sensitive configuration here

@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: web-platform
+  labels:
+    app: web-platform
+    environment: production

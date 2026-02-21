@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:14-alpine
+    container_name: webapp-db
+    environment:
+      POSTGRES_DB: webapp
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - webapp-network
+
+  # FastAPI Application
+  web:
+    # For production/updates: use image from your registry (uncomment 'image' and comment 'build')
+    # image: your-org/web-platform:v1.0.0
+    # For development: build from source
+    build: .
+    container_name: webapp-web
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/webapp
+    ports:
+      - "8080:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./app:/app/app
+      - ./static:/app/static
+      - ./migrations:/app/migrations
+      - ./backups:/app/backups
+      # Optional: Enable automatic updates (advanced users only)
+      # WARNING: Mounting Docker socket gives the container access to Docker daemon
+      # - /var/run/docker.sock:/var/run/docker.sock
+      # - ./docker-compose.yml:/app/docker-compose.yml:ro
+      # To use external storage, change the path above:
+      # - /your/backup/path:/app/backups
+      # Optional: Mount SMB/NFS shares (uncomment and configure if using)
+      # - smb_backups:/mnt/smb_backups
+      # - nfs_backups:/mnt/nfs_backups
+    networks:
+      - webapp-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  # Optional: Define SMB and NFS volumes (uncomment if using file shares)
+  # smb_backups:
+  #   driver: local
+  #   driver_opts:
+  #     type: cifs
+  #     o: username=${SMB_USERNAME},password=${SMB_PASSWORD},vers=3.0
+  #     device: //${SMB_HOST}/${SMB_SHARE}
+  # nfs_backups:
+  #   driver: local
+  #   driver_opts:
+  #     type: nfs
+  #     o: addr=${NFS_HOST},rw
+  #     device: ":${NFS_EXPORT}"
+
+networks:
+  webapp-network:
+    driver: bridge
