@@ -27,7 +27,9 @@
                     <input type="password" id="login-password" placeholder="Password" required>
                     <button type="submit">Login</button>
                 </form>
-                <p>Don't have an account? <a href="#" onclick="showRegister()">Register here</a></p>
+                <div id="oauth-buttons" class="mt-2"></div>
+                <p class="mt-2">Don't have an account? <a href="#" onclick="showRegister()">Register here</a></p>
+                <p><a href="#" onclick="showForgotPassword()" class="text-muted small">Forgot password?</a></p>
                 <div id="login-error" class="error-message"></div>
             </div>
 
@@ -42,6 +44,44 @@
                 </form>
                 <p>Already have an account? <a href="#" onclick="showLogin()">Login here</a></p>
                 <div id="register-error" class="error-message"></div>
+            </div>
+
+            <!-- TOTP Verification Step -->
+            <div id="totp-form" class="auth-form" style="display: none;">
+                <h2>Two-Factor Authentication</h2>
+                <p class="text-muted small">Enter the 6-digit code from your authenticator app.</p>
+                <form onsubmit="handleTotpVerify(event)">
+                    <input type="text" id="totp-code" placeholder="000000" maxlength="6" inputmode="numeric" pattern="[0-9]{6}" required autocomplete="one-time-code">
+                    <button type="submit">Verify</button>
+                </form>
+                <p><a href="#" onclick="showLogin()" class="text-muted small">Back to login</a></p>
+                <div id="totp-error" class="error-message"></div>
+            </div>
+
+            <!-- Forgot Password Form -->
+            <div id="forgot-password-form" class="auth-form" style="display: none;">
+                <h2>Forgot Password</h2>
+                <p class="text-muted small">Enter your email and we'll send a reset link.</p>
+                <form onsubmit="handleForgotPassword(event)">
+                    <input type="email" id="forgot-email" placeholder="Email address" required>
+                    <button type="submit">Send Reset Link</button>
+                </form>
+                <p><a href="#" onclick="showLogin()" class="text-muted small">Back to login</a></p>
+                <div id="forgot-error" class="error-message"></div>
+                <div id="forgot-success" class="text-success small mt-2" style="display:none;"></div>
+            </div>
+
+            <!-- Reset Password Form (shown when ?reset_token= is in URL) -->
+            <div id="reset-password-form" class="auth-form" style="display: none;">
+                <h2>Reset Password</h2>
+                <form onsubmit="handleResetPassword(event)">
+                    <input type="password" id="reset-new-password" placeholder="New password" required>
+                    <input type="password" id="reset-confirm-password" placeholder="Confirm new password" required>
+                    <button type="submit">Reset Password</button>
+                </form>
+                <p><a href="#" onclick="showLogin()" class="text-muted small">Back to login</a></p>
+                <div id="reset-error" class="error-message"></div>
+                <div id="reset-success" class="text-success small mt-2" style="display:none;"></div>
             </div>
         </div>
     </div>
@@ -64,9 +104,82 @@
             </div>
         </header>
 
+        <!-- Email verification banner (shown when email is not yet verified) -->
+        <div id="email-verify-banner" class="alert alert-warning alert-dismissible d-flex align-items-center mx-3 mt-2" role="alert" style="display:none !important;">
+            <i class="bi bi-envelope-exclamation me-2"></i>
+            <div>Your email address is not verified.
+                <a href="#" onclick="resendVerification()" class="alert-link ms-1">Resend verification email</a>
+            </div>
+            <button type="button" class="btn-close ms-auto" onclick="this.closest('.alert').style.display='none'"></button>
+        </div>
+
+        <!-- TOTP Setup Modal -->
+        <div class="modal fade" id="totpSetupModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Set Up Two-Factor Authentication</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body text-center">
+                        <p>Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)</p>
+                        <img id="totp-qr-img" src="" alt="TOTP QR Code" class="img-fluid mb-3" style="max-width:220px;">
+                        <p class="text-muted small">Or enter manually: <code id="totp-secret-text"></code></p>
+                        <hr>
+                        <p>Confirm with a 6-digit code:</p>
+                        <div class="d-flex gap-2">
+                            <input type="text" id="totp-enable-code" class="form-control" placeholder="000000" maxlength="6" inputmode="numeric">
+                            <button class="btn btn-primary" onclick="handleTotpEnable()">Enable</button>
+                        </div>
+                        <div id="totp-setup-error" class="text-danger small mt-2"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Disable TOTP Modal -->
+        <div class="modal fade" id="totpDisableModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Disable Two-Factor Authentication</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Enter your current 6-digit code to confirm:</p>
+                        <div class="d-flex gap-2">
+                            <input type="text" id="totp-disable-code" class="form-control" placeholder="000000" maxlength="6" inputmode="numeric">
+                            <button class="btn btn-danger" onclick="handleTotpDisable()">Disable</button>
+                        </div>
+                        <div id="totp-disable-error" class="text-danger small mt-2"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sessions Modal -->
+        <div class="modal fade" id="sessionsModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="bi bi-shield-lock me-2"></i>Active Sessions</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="d-flex justify-content-end mb-2">
+                            <button class="btn btn-sm btn-outline-danger" onclick="revokeAllSessions()">
+                                <i class="bi bi-x-circle me-1"></i>Revoke All (Logout Everywhere)
+                            </button>
+                        </div>
+                        <div id="sessions-list"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Dashboard Content -->
         <main class="container-fluid py-4">
-            <div class="row">
+            <div class="row g-3">
                 <div class="col-12">
                     <div class="card shadow-sm">
                         <div class="card-body text-center py-5">
@@ -76,6 +189,26 @@
                                 This is a generic web platform template.<br>
                                 Replace this content with your application's features.
                             </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Account Security Card -->
+                <div class="col-md-6">
+                    <div class="card shadow-sm">
+                        <div class="card-header"><i class="bi bi-shield-check me-2"></i>Account Security</div>
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span>Two-Factor Authentication (TOTP)</span>
+                                <span id="totp-status-badge" class="badge bg-secondary">Not set up</span>
+                            </div>
+                            <div class="d-flex gap-2 flex-wrap">
+                                <button id="totp-setup-btn" class="btn btn-sm btn-outline-primary" onclick="setupTotp()">Set up 2FA</button>
+                                <button id="totp-disable-btn" class="btn btn-sm btn-outline-danger" onclick="showDisableTotp()" style="display:none;">Disable 2FA</button>
+                                <button class="btn btn-sm btn-outline-secondary ms-auto" onclick="showSessions()">
+                                    <i class="bi bi-list-ul me-1"></i>Active Sessions
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

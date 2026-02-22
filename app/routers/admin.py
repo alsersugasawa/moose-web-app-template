@@ -130,7 +130,7 @@ async def setup_admin(
         )
         db.add(app_config)
 
-    # Create admin user
+    # Create admin user (mark as email_verified — setup flow confirms identity)
     hashed_password = get_password_hash(admin_data.password)
     new_admin = User(
         username=admin_data.username,
@@ -138,7 +138,8 @@ async def setup_admin(
         hashed_password=hashed_password,
         is_admin=True,
         is_active=True,
-        onboarding_completed=False
+        onboarding_completed=False,
+        email_verified=True,
     )
 
     db.add(new_admin)
@@ -1514,3 +1515,147 @@ async def get_update_status(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get update status: {str(e)}"
         )
+
+
+# ─── Certificate Management ───────────────────────────────────────────────────
+
+CERTS_DIR = Path(os.getenv("CERTS_DIR", "/app/certs"))
+
+
+def _parse_pem_cert(pem_bytes: bytes) -> dict:
+    """Parse a PEM certificate and return human-readable metadata."""
+    from cryptography import x509
+    cert = x509.load_pem_x509_certificate(pem_bytes)
+    now = datetime.utcnow()
+    try:
+        expires = cert.not_valid_after_utc.replace(tzinfo=None)
+        not_before = cert.not_valid_before_utc.replace(tzinfo=None)
+    except AttributeError:
+        # Fallback for older cryptography versions
+        expires = cert.not_valid_after
+        not_before = cert.not_valid_before
+    return {
+        "subject": cert.subject.rfc4514_string(),
+        "issuer": cert.issuer.rfc4514_string(),
+        "not_valid_before": not_before.isoformat(),
+        "not_valid_after": expires.isoformat(),
+        "days_remaining": (expires - now).days,
+        "is_expired": now > expires,
+        "serial_number": str(cert.serial_number),
+    }
+
+
+@router.get("/certs")
+async def get_cert_status(
+    current_admin: User = Depends(get_current_admin_user),
+):
+    """Return TLS certificate status from /app/certs/cert.pem."""
+    cert_path = CERTS_DIR / "cert.pem"
+    if not cert_path.exists():
+        return {"present": False}
+    try:
+        info = _parse_pem_cert(cert_path.read_bytes())
+        return {"present": True, **info}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to parse certificate: {exc}")
+
+
+@router.post("/certs/upload")
+async def upload_cert(
+    cert_file: UploadFile = File(...),
+    key_file: UploadFile = File(None),
+    passphrase: str = None,
+    current_admin: User = Depends(get_current_admin_user),
+    db: AsyncSession = Depends(get_db),
+    request: Request = None,
+):
+    """Upload a TLS certificate (PEM, CRT, or PFX/P12) and optional private key."""
+    CERTS_DIR.mkdir(parents=True, exist_ok=True)
+    filename = (cert_file.filename or "").lower()
+    cert_bytes = await cert_file.read()
+
+    # Size sanity check (max 64 KB)
+    if len(cert_bytes) > 65536:
+        raise HTTPException(status_code=400, detail="Certificate file too large (max 64 KB)")
+
+    if filename.endswith((".pfx", ".p12")):
+        # Convert PKCS#12 to PEM
+        try:
+            from cryptography.hazmat.primitives.serialization import pkcs12, Encoding, PrivateFormat, NoEncryption
+            pwd = passphrase.encode() if passphrase else None
+            private_key, certificate, _ = pkcs12.load_key_and_certificates(cert_bytes, pwd)
+            cert_pem = certificate.public_bytes(Encoding.PEM)
+            key_pem = private_key.private_bytes(Encoding.PEM, PrivateFormat.TraditionalOpenSSL, NoEncryption()) if private_key else None
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=f"Failed to parse PFX: {exc}")
+    elif filename.endswith((".pem", ".crt", ".cer")):
+        cert_pem = cert_bytes
+        key_pem = (await key_file.read()) if key_file else None
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported file type. Use .pem, .crt, .pfx, or .p12")
+
+    # Validate the certificate is parseable
+    try:
+        info = _parse_pem_cert(cert_pem)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid certificate: {exc}")
+
+    # Write files
+    (CERTS_DIR / "cert.pem").write_bytes(cert_pem)
+    if key_pem:
+        (CERTS_DIR / "key.pem").write_bytes(key_pem)
+
+    await log_action(
+        db, "INFO", "TLS certificate uploaded",
+        user_id=current_admin.id, action="cert_uploaded",
+        details={"subject": info["subject"], "expires": info["not_valid_after"]},
+        ip_address=request.client.host if request else None,
+    )
+    return {"message": "Certificate uploaded successfully", "cert_info": {"present": True, **info}}
+
+
+@router.post("/certs/renew")
+async def trigger_cert_renewal(
+    current_admin: User = Depends(get_current_admin_user),
+    db: AsyncSession = Depends(get_db),
+    request: Request = None,
+):
+    """Signal Caddy to reload its configuration / renew certificates via the admin API."""
+    import httpx
+    caddy_admin = os.getenv("CADDY_ADMIN_URL", "http://caddy:2019")
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.post(f"{caddy_admin}/load", content=b"{}", headers={"Content-Type": "application/json"})
+        await log_action(
+            db, "INFO", "Certificate renewal triggered via Caddy admin API",
+            user_id=current_admin.id, action="cert_renew",
+            ip_address=request.client.host if request else None,
+        )
+        return {"message": "Certificate renewal triggered", "caddy_status": resp.status_code}
+    except Exception as exc:
+        return {
+            "message": f"Could not reach Caddy admin API ({caddy_admin}). Renewal may need to be triggered manually.",
+            "error": str(exc),
+        }
+
+
+@router.delete("/certs")
+async def remove_custom_cert(
+    current_admin: User = Depends(get_current_admin_user),
+    db: AsyncSession = Depends(get_db),
+    request: Request = None,
+):
+    """Remove the custom certificate from /app/certs. Caddy will fall back to ACME."""
+    removed = []
+    for name in ("cert.pem", "key.pem"):
+        path = CERTS_DIR / name
+        if path.exists():
+            path.unlink()
+            removed.append(name)
+    await log_action(
+        db, "WARNING", "Custom TLS certificate removed",
+        user_id=current_admin.id, action="cert_removed",
+        details={"removed_files": removed},
+        ip_address=request.client.host if request else None,
+    )
+    return {"message": f"Removed: {', '.join(removed) if removed else 'nothing to remove'}"}

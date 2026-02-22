@@ -70,6 +70,9 @@ function showSection(sectionName) {
             loadBackupConfig();
             loadBackups();
             break;
+        case 'certificates':
+            loadCertStatus();
+            break;
     }
 }
 
@@ -1356,4 +1359,122 @@ if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initializeTheme);
 } else {
     initializeTheme();
+}
+
+// ─── Certificate Management ───────────────────────────────────────────────────
+
+async function loadCertStatus() {
+    const body = document.getElementById('cert-status-body');
+    if (!body) return;
+    body.innerHTML = '<p class="text-muted">Loading…</p>';
+    try {
+        const res = await fetch(`${API_BASE}/api/admin/certs`, {
+            headers: { Authorization: `Bearer ${adminToken}` }
+        });
+        if (!res.ok) { body.innerHTML = '<p class="text-danger">Failed to load certificate status.</p>'; return; }
+        const d = await res.json();
+        if (!d.present) {
+            body.innerHTML = '<p class="text-muted"><i class="bi bi-x-circle text-secondary me-2"></i>No custom certificate installed. Caddy is using its automatic ACME certificate.</p>';
+            return;
+        }
+        const daysClass = d.is_expired ? 'text-danger' : (d.days_remaining < 30 ? 'text-warning' : 'text-success');
+        body.innerHTML = `
+            <table class="table table-sm mb-0">
+                <tr><th>Subject</th><td>${_adminEscHtml(d.subject || '—')}</td></tr>
+                <tr><th>Issuer</th><td>${_adminEscHtml(d.issuer || '—')}</td></tr>
+                <tr><th>Valid From</th><td>${d.not_valid_before || '—'}</td></tr>
+                <tr><th>Expires</th><td>${d.not_valid_after || '—'}</td></tr>
+                <tr><th>Days Remaining</th><td class="${daysClass} fw-semibold">${d.is_expired ? 'EXPIRED' : d.days_remaining}</td></tr>
+                <tr><th>Serial</th><td class="text-muted small">${d.serial_number || '—'}</td></tr>
+            </table>`;
+    } catch (_) {
+        body.innerHTML = '<p class="text-danger">Network error.</p>';
+    }
+}
+
+async function uploadCert(event) {
+    event.preventDefault();
+    const certFile = document.getElementById('cert-file-input').files[0];
+    const keyFile = document.getElementById('key-file-input').files[0];
+    const passphrase = document.getElementById('pfx-passphrase-input').value;
+    const errEl = document.getElementById('cert-upload-error');
+    const successEl = document.getElementById('cert-upload-success');
+    errEl.textContent = '';
+    successEl.style.display = 'none';
+
+    if (!certFile) { errEl.textContent = 'Please select a certificate file.'; return; }
+
+    const formData = new FormData();
+    formData.append('cert_file', certFile);
+    if (keyFile) formData.append('key_file', keyFile);
+    if (passphrase) formData.append('passphrase', passphrase);
+
+    try {
+        const res = await fetch(`${API_BASE}/api/admin/certs/upload`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${adminToken}` },
+            body: formData
+        });
+        const data = await res.json();
+        if (res.ok) {
+            successEl.textContent = data.message || 'Certificate uploaded successfully.';
+            successEl.style.display = 'block';
+            await loadCertStatus();
+        } else {
+            errEl.textContent = data.detail || 'Upload failed.';
+        }
+    } catch (_) {
+        errEl.textContent = 'Network error.';
+    }
+}
+
+async function triggerCertRenewal() {
+    const resultEl = document.getElementById('cert-action-result');
+    resultEl.textContent = 'Triggering renewal…';
+    try {
+        const res = await fetch(`${API_BASE}/api/admin/certs/renew`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${adminToken}` }
+        });
+        const data = await res.json();
+        resultEl.textContent = data.message || 'Done.';
+    } catch (_) {
+        resultEl.textContent = 'Network error.';
+    }
+}
+
+async function removeCustomCert() {
+    if (!confirm('Remove the custom certificate? Caddy will fall back to its automatic ACME certificate.')) return;
+    const resultEl = document.getElementById('cert-action-result');
+    resultEl.textContent = 'Removing…';
+    try {
+        const res = await fetch(`${API_BASE}/api/admin/certs`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${adminToken}` }
+        });
+        const data = await res.json();
+        resultEl.textContent = data.message || 'Done.';
+        await loadCertStatus();
+    } catch (_) {
+        resultEl.textContent = 'Network error.';
+    }
+}
+
+// Show/hide PFX passphrase field based on file selection
+document.addEventListener('DOMContentLoaded', () => {
+    const certInput = document.getElementById('cert-file-input');
+    if (certInput) {
+        certInput.addEventListener('change', () => {
+            const name = (certInput.files[0]?.name || '').toLowerCase();
+            const isPfx = name.endsWith('.pfx') || name.endsWith('.p12');
+            document.getElementById('key-file-row').style.display = isPfx ? 'none' : '';
+            document.getElementById('pfx-passphrase-row').style.display = isPfx ? '' : 'none';
+        });
+    }
+});
+
+function _adminEscHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }

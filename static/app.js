@@ -1,6 +1,8 @@
 // Global state
 let authToken = localStorage.getItem('authToken');
 let currentUser = null;
+let pendingTotpToken = null;   // short-lived token held during 2FA login step (never in localStorage)
+let pendingResetToken = null;  // password-reset token from ?reset_token= URL param
 
 const API_BASE = '/api';
 
@@ -8,6 +10,10 @@ const API_BASE = '/api';
 
 document.addEventListener('DOMContentLoaded', async () => {
     await loadAppConfig();
+    checkUrlParams();       // ?verify_token= and ?reset_token=
+    checkOAuthCallback();   // #oauth_token= fragment
+    loadOAuthProviders();   // render social-login buttons
+
     if (authToken) {
         await initApp();
     } else {
@@ -38,12 +44,13 @@ async function initApp() {
         if (!res.ok) throw new Error('Unauthorized');
         currentUser = await res.json();
         showApp();
+        updateTotpUI();
     } catch (_) {
         logout();
     }
 }
 
-// ─── Auth ─────────────────────────────────────────────────────────────────────
+// ─── Auth screens ─────────────────────────────────────────────────────────────
 
 function showAuth() {
     document.getElementById('auth-container').style.display = 'flex';
@@ -58,20 +65,124 @@ function showApp() {
     if (usernameEl) usernameEl.textContent = currentUser.username;
 
     const adminLink = document.getElementById('admin-link');
-    if (adminLink && currentUser.is_admin) {
-        adminLink.style.display = 'inline-block';
+    if (adminLink && currentUser.is_admin) adminLink.style.display = 'inline-block';
+
+    // Show email verification banner when email is not yet verified
+    const banner = document.getElementById('email-verify-banner');
+    if (banner && currentUser.email_verified === false) {
+        banner.style.cssText = 'display: flex !important;';
     }
 }
 
 function showLogin() {
+    _hideAllAuthForms();
     document.getElementById('login-form').style.display = 'block';
-    document.getElementById('register-form').style.display = 'none';
 }
 
 function showRegister() {
-    document.getElementById('login-form').style.display = 'none';
+    _hideAllAuthForms();
     document.getElementById('register-form').style.display = 'block';
 }
+
+function showTotpForm() {
+    _hideAllAuthForms();
+    document.getElementById('totp-form').style.display = 'block';
+}
+
+function showForgotPassword() {
+    _hideAllAuthForms();
+    document.getElementById('forgot-password-form').style.display = 'block';
+}
+
+function showResetPassword() {
+    _hideAllAuthForms();
+    document.getElementById('reset-password-form').style.display = 'block';
+}
+
+function _hideAllAuthForms() {
+    ['login-form', 'register-form', 'totp-form', 'forgot-password-form', 'reset-password-form']
+        .forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = 'none';
+        });
+}
+
+// ─── URL param and fragment handling ─────────────────────────────────────────
+
+function checkUrlParams() {
+    const params = new URLSearchParams(window.location.search);
+
+    const verifyToken = params.get('verify_token');
+    if (verifyToken) {
+        history.replaceState(null, '', window.location.pathname);
+        _verifyEmail(verifyToken);
+        return;
+    }
+
+    const resetToken = params.get('reset_token');
+    if (resetToken) {
+        history.replaceState(null, '', window.location.pathname);
+        pendingResetToken = resetToken;
+        showAuth();
+        showResetPassword();
+    }
+}
+
+async function _verifyEmail(token) {
+    try {
+        const res = await fetch(`${API_BASE}/auth/verify-email?token=${encodeURIComponent(token)}`, {
+            method: 'POST'
+        });
+        const data = await res.json();
+        showAuth();
+        showLogin();
+        const errEl = document.getElementById('login-error');
+        if (errEl) {
+            errEl.style.color = res.ok ? 'green' : '';
+            errEl.textContent = res.ok
+                ? 'Email verified! You can now log in.'
+                : (data.detail || 'Email verification failed.');
+        }
+    } catch (_) {}
+}
+
+function checkOAuthCallback() {
+    const hash = window.location.hash;
+    if (hash.startsWith('#oauth_token=')) {
+        const token = hash.slice('#oauth_token='.length);
+        history.replaceState(null, '', window.location.pathname);
+        authToken = token;
+        localStorage.setItem('authToken', authToken);
+        initApp();
+    }
+}
+
+async function loadOAuthProviders() {
+    try {
+        const res = await fetch(`${API_BASE}/auth/oauth/providers`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const container = document.getElementById('oauth-buttons');
+        if (!container || !data.providers || data.providers.length === 0) return;
+
+        const divider = document.createElement('div');
+        divider.className = 'text-center text-muted small my-2';
+        divider.textContent = '— or continue with —';
+        container.appendChild(divider);
+
+        const ICONS = { google: 'bi-google', github: 'bi-github' };
+        data.providers.forEach(provider => {
+            const btn = document.createElement('a');
+            btn.href = `${API_BASE}/auth/oauth/${provider}`;
+            btn.className = 'btn btn-outline-secondary w-100 mb-2 d-flex align-items-center justify-content-center gap-2';
+            const icon = ICONS[provider] || 'bi-box-arrow-in-right';
+            btn.innerHTML = `<i class="bi ${icon}"></i> Continue with ${provider.charAt(0).toUpperCase() + provider.slice(1)}`;
+            container.appendChild(btn);
+        });
+    } catch (_) {}
+}
+
+// ─── Login ────────────────────────────────────────────────────────────────────
 
 async function handleLogin(event) {
     event.preventDefault();
@@ -79,6 +190,7 @@ async function handleLogin(event) {
     const password = document.getElementById('login-password').value;
     const errorEl = document.getElementById('login-error');
     errorEl.textContent = '';
+    errorEl.style.color = '';
 
     try {
         const res = await fetch(`${API_BASE}/auth/login`, {
@@ -92,6 +204,13 @@ async function handleLogin(event) {
             return;
         }
         const data = await res.json();
+
+        if (data.totp_required) {
+            pendingTotpToken = data.access_token; // held in memory only
+            showTotpForm();
+            return;
+        }
+
         authToken = data.access_token;
         localStorage.setItem('authToken', authToken);
         await initApp();
@@ -99,6 +218,8 @@ async function handleLogin(event) {
         errorEl.textContent = 'Network error. Please try again.';
     }
 }
+
+// ─── Register ─────────────────────────────────────────────────────────────────
 
 async function handleRegister(event) {
     event.preventDefault();
@@ -116,26 +237,313 @@ async function handleRegister(event) {
         });
         if (!res.ok) {
             const data = await res.json();
-            errorEl.textContent = data.detail || 'Registration failed';
+            const detail = Array.isArray(data.detail)
+                ? data.detail.join(' ')
+                : (data.detail || 'Registration failed');
+            errorEl.textContent = detail;
             return;
         }
         // Auto-login after registration
         document.getElementById('login-username').value = username;
         document.getElementById('login-password').value = password;
         showLogin();
-        await handleLogin({ preventDefault: () => {}, target: null });
+        await handleLogin({ preventDefault: () => {} });
     } catch (_) {
         errorEl.textContent = 'Network error. Please try again.';
     }
 }
 
-function handleLogout() {
-    logout();
+// ─── TOTP verification during login ──────────────────────────────────────────
+
+async function handleTotpVerify(event) {
+    event.preventDefault();
+    const code = document.getElementById('totp-code').value.trim();
+    const errorEl = document.getElementById('totp-error');
+    errorEl.textContent = '';
+
+    if (!pendingTotpToken) { showLogin(); return; }
+
+    try {
+        const res = await fetch(`${API_BASE}/auth/totp/verify`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: pendingTotpToken, code })
+        });
+        if (!res.ok) {
+            const data = await res.json();
+            errorEl.textContent = data.detail || 'Invalid code';
+            return;
+        }
+        const data = await res.json();
+        pendingTotpToken = null;
+        authToken = data.access_token;
+        localStorage.setItem('authToken', authToken);
+        await initApp();
+    } catch (_) {
+        errorEl.textContent = 'Network error. Please try again.';
+    }
 }
+
+// ─── Forgot password ──────────────────────────────────────────────────────────
+
+async function handleForgotPassword(event) {
+    event.preventDefault();
+    const email = document.getElementById('forgot-email').value;
+    const errorEl = document.getElementById('forgot-error');
+    const successEl = document.getElementById('forgot-success');
+    errorEl.textContent = '';
+    successEl.style.display = 'none';
+
+    try {
+        const res = await fetch(`${API_BASE}/auth/forgot-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            successEl.textContent = data.message;
+            successEl.style.display = 'block';
+        } else {
+            errorEl.textContent = data.detail || 'Request failed';
+        }
+    } catch (_) {
+        errorEl.textContent = 'Network error. Please try again.';
+    }
+}
+
+// ─── Reset password ───────────────────────────────────────────────────────────
+
+async function handleResetPassword(event) {
+    event.preventDefault();
+    const newPassword = document.getElementById('reset-new-password').value;
+    const confirmPassword = document.getElementById('reset-confirm-password').value;
+    const errorEl = document.getElementById('reset-error');
+    const successEl = document.getElementById('reset-success');
+    errorEl.textContent = '';
+    successEl.style.display = 'none';
+
+    if (newPassword !== confirmPassword) {
+        errorEl.textContent = 'Passwords do not match';
+        return;
+    }
+    if (!pendingResetToken) {
+        errorEl.textContent = 'Reset token missing. Use the link from your email.';
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API_BASE}/auth/reset-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: pendingResetToken, new_password: newPassword })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            pendingResetToken = null;
+            successEl.textContent = data.message;
+            successEl.style.display = 'block';
+            setTimeout(() => showLogin(), 2000);
+        } else {
+            const detail = Array.isArray(data.detail)
+                ? data.detail.join(' ')
+                : (data.detail || 'Reset failed');
+            errorEl.textContent = detail;
+        }
+    } catch (_) {
+        errorEl.textContent = 'Network error. Please try again.';
+    }
+}
+
+// ─── Email verification resend ────────────────────────────────────────────────
+
+async function resendVerification() {
+    try {
+        const res = await fetch(`${API_BASE}/auth/resend-verification`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${authToken}` }
+        });
+        const data = await res.json();
+        alert(res.ok ? data.message : (data.detail || 'Failed to resend'));
+    } catch (_) {
+        alert('Network error.');
+    }
+}
+
+// ─── TOTP setup & management ──────────────────────────────────────────────────
+
+function updateTotpUI() {
+    if (!currentUser) return;
+    const badge = document.getElementById('totp-status-badge');
+    const setupBtn = document.getElementById('totp-setup-btn');
+    const disableBtn = document.getElementById('totp-disable-btn');
+
+    if (currentUser.totp_enabled) {
+        if (badge) { badge.textContent = 'Enabled'; badge.className = 'badge bg-success'; }
+        if (setupBtn) setupBtn.style.display = 'none';
+        if (disableBtn) disableBtn.style.display = 'inline-block';
+    } else {
+        if (badge) { badge.textContent = 'Not set up'; badge.className = 'badge bg-secondary'; }
+        if (setupBtn) setupBtn.style.display = 'inline-block';
+        if (disableBtn) disableBtn.style.display = 'none';
+    }
+}
+
+async function setupTotp() {
+    try {
+        const res = await fetch(`${API_BASE}/auth/totp/setup`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${authToken}` }
+        });
+        if (!res.ok) { alert('Failed to initiate TOTP setup'); return; }
+        const data = await res.json();
+        document.getElementById('totp-qr-img').src = data.qr_code;
+        document.getElementById('totp-secret-text').textContent = data.secret;
+        document.getElementById('totp-enable-code').value = '';
+        document.getElementById('totp-setup-error').textContent = '';
+        new bootstrap.Modal(document.getElementById('totpSetupModal')).show();
+    } catch (_) {
+        alert('Network error.');
+    }
+}
+
+async function handleTotpEnable() {
+    const code = document.getElementById('totp-enable-code').value.trim();
+    const errorEl = document.getElementById('totp-setup-error');
+    errorEl.textContent = '';
+    try {
+        const res = await fetch(`${API_BASE}/auth/totp/enable`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${authToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('totpSetupModal')).hide();
+            currentUser.totp_enabled = true;
+            updateTotpUI();
+            alert('Two-factor authentication enabled!');
+        } else {
+            errorEl.textContent = data.detail || 'Invalid code';
+        }
+    } catch (_) {
+        errorEl.textContent = 'Network error.';
+    }
+}
+
+function showDisableTotp() {
+    document.getElementById('totp-disable-code').value = '';
+    document.getElementById('totp-disable-error').textContent = '';
+    new bootstrap.Modal(document.getElementById('totpDisableModal')).show();
+}
+
+async function handleTotpDisable() {
+    const code = document.getElementById('totp-disable-code').value.trim();
+    const errorEl = document.getElementById('totp-disable-error');
+    errorEl.textContent = '';
+    try {
+        const res = await fetch(`${API_BASE}/auth/totp/disable`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${authToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('totpDisableModal')).hide();
+            currentUser.totp_enabled = false;
+            updateTotpUI();
+            alert('Two-factor authentication disabled.');
+        } else {
+            errorEl.textContent = data.detail || 'Invalid code';
+        }
+    } catch (_) {
+        errorEl.textContent = 'Network error.';
+    }
+}
+
+// ─── Session management ───────────────────────────────────────────────────────
+
+async function showSessions() {
+    await loadSessions();
+    new bootstrap.Modal(document.getElementById('sessionsModal')).show();
+}
+
+async function loadSessions() {
+    const container = document.getElementById('sessions-list');
+    container.innerHTML = '<p class="text-muted text-center">Loading...</p>';
+    try {
+        const res = await fetch(`${API_BASE}/auth/sessions`, {
+            headers: { Authorization: `Bearer ${authToken}` }
+        });
+        if (!res.ok) { container.innerHTML = '<p class="text-danger">Failed to load sessions.</p>'; return; }
+        const sessions = await res.json();
+        if (sessions.length === 0) {
+            container.innerHTML = '<p class="text-muted text-center">No active sessions.</p>';
+            return;
+        }
+        container.innerHTML = sessions.map(s => `
+            <div class="d-flex align-items-center border rounded p-2 mb-2 gap-2">
+                <i class="bi bi-laptop fs-4 text-muted"></i>
+                <div class="flex-grow-1 small">
+                    <div class="fw-semibold">${_escHtml(s.device_info || 'Unknown device')}</div>
+                    <div class="text-muted">IP: ${_escHtml(s.ip_address || '—')} &bull; Last used: ${_fmtDate(s.last_used)}</div>
+                    <div class="text-muted">Created: ${_fmtDate(s.created_at)}</div>
+                </div>
+                <button class="btn btn-sm btn-outline-danger" onclick="revokeSession('${s.id}')">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>`).join('');
+    } catch (_) {
+        container.innerHTML = '<p class="text-danger">Network error.</p>';
+    }
+}
+
+async function revokeSession(sessionId) {
+    if (!confirm('Revoke this session?')) return;
+    try {
+        const res = await fetch(`${API_BASE}/auth/sessions/${sessionId}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${authToken}` }
+        });
+        if (res.ok) await loadSessions();
+        else alert('Failed to revoke session.');
+    } catch (_) { alert('Network error.'); }
+}
+
+async function revokeAllSessions() {
+    if (!confirm('Revoke all sessions? You will be logged out everywhere.')) return;
+    try {
+        const res = await fetch(`${API_BASE}/auth/sessions/all`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${authToken}` }
+        });
+        if (res.ok) logout();
+        else alert('Failed to revoke sessions.');
+    } catch (_) { alert('Network error.'); }
+}
+
+// ─── Logout ───────────────────────────────────────────────────────────────────
+
+function handleLogout() { logout(); }
 
 function logout() {
     authToken = null;
     currentUser = null;
+    pendingTotpToken = null;
     localStorage.removeItem('authToken');
     showAuth();
+    showLogin();
+}
+
+// ─── Utilities ────────────────────────────────────────────────────────────────
+
+function _escHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function _fmtDate(iso) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleString();
 }

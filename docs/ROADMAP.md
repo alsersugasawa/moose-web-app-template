@@ -8,6 +8,7 @@ Features are organized into phases by theme. Items within each phase are roughly
 
 Strengthen the existing auth system with standard account-security features.
 
+- [ ] **HTTPS support & certificate management** — TLS termination with automatic certificate provisioning (Let's Encrypt / ACME), renewal, and a UI in the admin portal to view certificate status, expiry, trigger manual renewal, and upload or replace custom certificates (PEM/PFX) directly from the UI
 - [ ] **Email verification** — Require users to confirm their email address on registration before accessing the app
 - [ ] **Password reset via email** — "Forgot password" flow with time-limited, single-use reset tokens
 - [ ] **OAuth 2.0 / social login** — Sign in with Google, GitHub, etc. via the `authlib` library

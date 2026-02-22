@@ -3,10 +3,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
+from starlette.middleware.sessions import SessionMiddleware
 from contextlib import asynccontextmanager
 import os
 from app.database import init_db
 from app.routers import auth, admin
+from app.routers import oauth as oauth_router
+from app.auth import get_secret_key
 from app.security import (
     SecurityHeadersMiddleware,
     RateLimitMiddleware,
@@ -39,6 +42,9 @@ app = FastAPI(
     docs_url="/docs" if os.getenv("ENVIRONMENT", "development") == "development" else None,
     redoc_url="/redoc" if os.getenv("ENVIRONMENT", "development") == "development" else None,
 )
+
+# Session middleware for OAuth CSRF state (uses SECRET_KEY for signing)
+app.add_middleware(SessionMiddleware, secret_key=get_secret_key(), https_only=False)
 
 # Add Security Headers Middleware (OWASP ASVS 14.4.1-7, NIST SP 800-53 SC-8)
 if SECURITY_HEADERS_ENABLED:
@@ -74,6 +80,7 @@ app.add_middleware(
 # Include routers
 app.include_router(auth.router)
 app.include_router(admin.router)
+app.include_router(oauth_router.router)
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")

@@ -31,8 +31,19 @@ services:
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/webapp
-    ports:
-      - "8080:8000"
+      # Email (SMTP) — leave SMTP_HOST blank to disable (prints links to stdout in dev)
+      # SMTP_HOST: smtp.example.com
+      # SMTP_PORT: 587
+      # SMTP_USER: user@example.com
+      # SMTP_PASSWORD: your-smtp-password
+      # SMTP_FROM: noreply@example.com
+      # SMTP_TLS: "true"
+      # APP_BASE_URL: https://yourdomain.com
+      # OAuth 2.0 — uncomment and set to enable social login
+      # GOOGLE_CLIENT_ID: your-google-client-id
+      # GOOGLE_CLIENT_SECRET: your-google-client-secret
+      # GITHUB_CLIENT_ID: your-github-client-id
+      # GITHUB_CLIENT_SECRET: your-github-client-secret
     depends_on:
       db:
         condition: service_healthy
@@ -41,6 +52,7 @@ services:
       - ./static:/app/static
       - ./migrations:/app/migrations
       - ./backups:/app/backups
+      - ./certs:/app/certs
       # Optional: Enable automatic updates (advanced users only)
       # WARNING: Mounting Docker socket gives the container access to Docker daemon
       # - /var/run/docker.sock:/var/run/docker.sock
@@ -54,8 +66,33 @@ services:
       - webapp-network
     restart: unless-stopped
 
+  # Caddy reverse proxy — automatic HTTPS via Let's Encrypt / ACME
+  # Set CADDY_DOMAIN to your public domain for auto certificates.
+  # Leave unset (defaults to "localhost") for a self-signed dev certificate.
+  caddy:
+    image: caddy:2-alpine
+    container_name: webapp-caddy
+    environment:
+      CADDY_DOMAIN: ${CADDY_DOMAIN:-localhost}
+      CADDY_EMAIL: ${CADDY_EMAIL:-admin@example.com}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./certs:/app/certs:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - webapp-network
+    depends_on:
+      - web
+    restart: unless-stopped
+
 volumes:
   postgres_data:
+  caddy_data:
+  caddy_config:
   # Optional: Define SMB and NFS volumes (uncomment if using file shares)
   # smb_backups:
   #   driver: local
