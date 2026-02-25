@@ -23,6 +23,7 @@
             <a href="#logs" class="nav-link" onclick="showSection('logs')">Logs</a>
             <a href="#backups" class="nav-link" onclick="showSection('backups')">Backups</a>
             <a href="#certificates" class="nav-link" onclick="showSection('certificates')">Certificates</a>
+            <a href="#myaccount" class="nav-link" onclick="showSection('myaccount')">My Account</a>
             <a href="#about" class="nav-link" onclick="showSection('about')">About</a>
         </div>
         <div class="nav-user">
@@ -62,31 +63,17 @@
                 </div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon">🌲</div>
+                <div class="stat-icon">🗄️</div>
                 <div class="stat-info">
-                    <h3 id="stat-web-platforms">0</h3>
-                    <p>Web Platforms</p>
+                    <h3 id="stat-db-size">—</h3>
+                    <p>Database Size</p>
                 </div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon">👨‍👩‍👧‍👦</div>
+                <div class="stat-icon">⏱️</div>
                 <div class="stat-info">
-                    <h3 id="stat-family-members">0</h3>
-                    <p>Family Members</p>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">🌳</div>
-                <div class="stat-info">
-                    <h3 id="stat-tree-views">0</h3>
-                    <p>Saved Views</p>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">🤝</div>
-                <div class="stat-info">
-                    <h3 id="stat-tree-shares">0</h3>
-                    <p>Tree Shares</p>
+                    <h3 id="stat-uptime">—</h3>
+                    <p>Uptime</p>
                 </div>
             </div>
         </div>
@@ -598,8 +585,7 @@
                     <strong>Database Backup includes:</strong>
                     <ul style="margin: 5px 0 0 20px;">
                         <li>All users and authentication data</li>
-                        <li>Family trees and members</li>
-                        <li>Tree shares and permissions</li>
+                        <li>Application data and records</li>
                         <li>System logs and backups metadata</li>
                     </ul>
                 </div>
@@ -816,6 +802,109 @@
                 </button>
             </div>
             <div class="card-footer text-muted small" id="cert-action-result"></div>
+        </div>
+    </div>
+
+    <!-- My Account Section -->
+    <div id="myaccount-section" class="content-section">
+        <div class="section-header">
+            <h2>My Account</h2>
+            <p>Update your administrator account details</p>
+        </div>
+
+        <!-- Account Overview -->
+        <div class="dashboard-card" style="margin-bottom: 24px;">
+            <h3><i class="bi bi-person-circle"></i> Account Overview</h3>
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="label">Username:</span>
+                    <span id="myacct-username" class="value">—</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Email:</span>
+                    <span id="myacct-email" class="value">—</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Email Verified:</span>
+                    <span id="myacct-verified" class="value">—</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Account Type:</span>
+                    <span id="myacct-role" class="value">—</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Last Login:</span>
+                    <span id="myacct-last-login" class="value">—</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Member Since:</span>
+                    <span id="myacct-created" class="value">—</span>
+                </div>
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; flex-wrap: wrap;">
+
+            <!-- Change Username -->
+            <div class="dashboard-card">
+                <h3><i class="bi bi-person-badge"></i> Change Username</h3>
+                <form id="form-update-username" onsubmit="handleUpdateUsername(event)">
+                    <div class="form-group">
+                        <label>New Username</label>
+                        <input type="text" id="new-username" placeholder="3–40 chars, letters/numbers/_" required minlength="3" maxlength="40" pattern="[a-zA-Z0-9_]+">
+                    </div>
+                    <div class="form-group">
+                        <label>Current Password <span style="color:#e74c3c">*</span></label>
+                        <input type="password" id="username-current-password" placeholder="Confirm your password" required autocomplete="current-password">
+                    </div>
+                    <div id="username-update-error" class="error-msg" style="display:none;"></div>
+                    <div id="username-update-success" class="success-msg" style="display:none;"></div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary" id="username-update-btn">Save Username</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Change Email -->
+            <div class="dashboard-card">
+                <h3><i class="bi bi-envelope"></i> Change Email</h3>
+                <form id="form-update-email" onsubmit="handleUpdateEmail(event)">
+                    <div class="form-group">
+                        <label>New Email Address</label>
+                        <input type="email" id="new-email" placeholder="new@example.com" required autocomplete="email">
+                    </div>
+                    <div id="email-update-error" class="error-msg" style="display:none;"></div>
+                    <div id="email-update-success" class="success-msg" style="display:none;"></div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary" id="email-update-btn">Save Email</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Change Password -->
+            <div class="dashboard-card">
+                <h3><i class="bi bi-lock"></i> Change Password</h3>
+                <form id="form-update-password" onsubmit="handleUpdatePassword(event)">
+                    <div class="form-group">
+                        <label>Current Password</label>
+                        <input type="password" id="current-password" placeholder="Your current password" required autocomplete="current-password">
+                    </div>
+                    <div class="form-group">
+                        <label>New Password</label>
+                        <input type="password" id="new-password" placeholder="At least 8 characters" required minlength="8" autocomplete="new-password">
+                    </div>
+                    <div class="form-group">
+                        <label>Confirm New Password</label>
+                        <input type="password" id="confirm-new-password" placeholder="Re-enter new password" required autocomplete="new-password">
+                    </div>
+                    <div id="password-update-error" class="error-msg" style="display:none;"></div>
+                    <div id="password-update-success" class="success-msg" style="display:none;"></div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary" id="password-update-btn">Save Password</button>
+                    </div>
+                </form>
+            </div>
+
         </div>
     </div>
 

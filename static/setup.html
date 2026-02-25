@@ -362,7 +362,7 @@
                 <div class="info-box">
                     <i class="bi bi-info-circle-fill"></i>
                     <strong>What is an admin account?</strong><br>
-                    The admin account has full access to manage users, backups, system settings, and all family trees in the application.
+                    The admin account has full access to manage users, backups, system settings, and all application data.
                 </div>
 
                 <div class="button-group">
@@ -471,11 +471,11 @@
                         <i class="bi bi-check-lg"></i>
                     </div>
                     <h2>Setup Complete!</h2>
-                    <p>Your administrator account has been created successfully. You can now log in and start using Web Platform.</p>
+                    <p id="successAppName">Your administrator account has been created successfully. You can now log in and start using the app.</p>
 
                     <div class="info-box">
                         <i class="bi bi-shield-check"></i>
-                        Your account has been created with admin privileges. You can manage users, create backups, and access all system features.
+                        Your account has been created with admin privileges. You can manage users, create backups, and access all system features from the admin portal.
                     </div>
 
                     <div class="button-group">
@@ -656,7 +656,9 @@
                 });
 
                 if (response.ok) {
-                    // Success - go to step 3
+                    // Success - update success message with chosen app name and go to step 3
+                    document.getElementById('successAppName').textContent =
+                        `Your administrator account has been created successfully. You can now log in and start using ${appName}.`;
                     nextStep();
                 } else {
                     const error = await response.json();

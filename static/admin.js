@@ -73,6 +73,9 @@ function showSection(sectionName) {
         case 'certificates':
             loadCertStatus();
             break;
+        case 'myaccount':
+            loadMyAccount();
+            break;
     }
 }
 
@@ -99,10 +102,8 @@ async function loadDashboard() {
         // Update stats
         document.getElementById('stat-total-users').textContent = data.total_users;
         document.getElementById('stat-active-users').textContent = data.active_users;
-        document.getElementById('stat-web-platforms').textContent = data.total_web_platforms;
-        document.getElementById('stat-family-members').textContent = data.total_family_members;
-        document.getElementById('stat-tree-views').textContent = data.total_tree_views;
-        document.getElementById('stat-tree-shares').textContent = data.total_tree_shares;
+        document.getElementById('stat-db-size').textContent = data.database_size || '—';
+        document.getElementById('stat-uptime').textContent = data.uptime || '—';
 
         // Update system resources with color coding
         updateResourceValue('system-cpu-percent', data.cpu_percent, '%');
@@ -549,8 +550,7 @@ function updateBackupTypeInfo() {
             <strong>Database Backup includes:</strong>
             <ul style="margin: 5px 0 0 20px;">
                 <li>All users and authentication data</li>
-                <li>Family trees and members</li>
-                <li>Tree shares and permissions</li>
+                <li>Application data and records</li>
                 <li>System logs and backups metadata</li>
             </ul>
         `,
@@ -568,7 +568,7 @@ function updateBackupTypeInfo() {
         'full': `
             <strong>Full Backup includes:</strong>
             <ul style="margin: 5px 0 0 20px;">
-                <li><strong>Database:</strong> All user data, trees, and system logs</li>
+                <li><strong>Database:</strong> All user data and system logs</li>
                 <li><strong>Configuration:</strong> App settings and Docker config</li>
             </ul>
             <em style="color: #28a745;">Recommended for complete system backup</em>
@@ -1477,4 +1477,128 @@ function _adminEscHtml(str) {
     return String(str)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;')
         .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ─── My Account ───────────────────────────────────────────────────────────────
+
+async function loadMyAccount() {
+    try {
+        const res = await fetch(`${API_BASE}/api/auth/me`, {
+            headers: { Authorization: `Bearer ${adminToken}` }
+        });
+        if (!res.ok) throw new Error('Failed to load account');
+        const me = await res.json();
+
+        document.getElementById('myacct-username').textContent   = me.username || '—';
+        document.getElementById('myacct-email').textContent      = me.email    || '—';
+        document.getElementById('myacct-verified').innerHTML     = me.email_verified
+            ? '<span style="color:#27ae60">✔ Verified</span>'
+            : '<span style="color:#e74c3c">✘ Not verified</span>';
+        document.getElementById('myacct-role').textContent       = me.is_admin ? 'Administrator' : 'User';
+        document.getElementById('myacct-last-login').textContent = me.last_login ? new Date(me.last_login).toLocaleString() : 'Never';
+        document.getElementById('myacct-created').textContent    = me.created_at ? new Date(me.created_at).toLocaleString() : '—';
+    } catch (err) {
+        console.error('loadMyAccount:', err);
+    }
+}
+
+function _showFieldMsg(errorId, successId, isError, msg) {
+    const errEl = document.getElementById(errorId);
+    const okEl  = document.getElementById(successId);
+    if (isError) {
+        errEl.textContent = msg; errEl.style.display = '';
+        okEl.style.display = 'none';
+    } else {
+        okEl.textContent = msg; okEl.style.display = '';
+        errEl.style.display = 'none';
+    }
+}
+
+async function handleUpdateUsername(event) {
+    event.preventDefault();
+    const btn = document.getElementById('username-update-btn');
+    const newUsername = document.getElementById('new-username').value.trim();
+    const password    = document.getElementById('username-current-password').value;
+
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+        const res = await fetch(
+            `${API_BASE}/api/auth/update-username?new_username=${encodeURIComponent(newUsername)}&current_password=${encodeURIComponent(password)}`,
+            { method: 'PUT', headers: { Authorization: `Bearer ${adminToken}` } }
+        );
+        const data = await res.json();
+        if (!res.ok) {
+            _showFieldMsg('username-update-error', 'username-update-success', true, data.detail || 'Update failed');
+        } else {
+            _showFieldMsg('username-update-error', 'username-update-success', false, data.message);
+            document.getElementById('new-username').value = '';
+            document.getElementById('username-current-password').value = '';
+            // Refresh the overview and the nav username display
+            document.getElementById('admin-username').textContent = newUsername;
+            await loadMyAccount();
+        }
+    } catch (_) {
+        _showFieldMsg('username-update-error', 'username-update-success', true, 'Network error. Please try again.');
+    } finally {
+        btn.disabled = false; btn.textContent = 'Save Username';
+    }
+}
+
+async function handleUpdateEmail(event) {
+    event.preventDefault();
+    const btn      = document.getElementById('email-update-btn');
+    const newEmail = document.getElementById('new-email').value.trim();
+
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+        const res = await fetch(
+            `${API_BASE}/api/auth/update-email?new_email=${encodeURIComponent(newEmail)}`,
+            { method: 'PUT', headers: { Authorization: `Bearer ${adminToken}` } }
+        );
+        const data = await res.json();
+        if (!res.ok) {
+            _showFieldMsg('email-update-error', 'email-update-success', true, data.detail || 'Update failed');
+        } else {
+            _showFieldMsg('email-update-error', 'email-update-success', false, data.message);
+            document.getElementById('new-email').value = '';
+            await loadMyAccount();
+        }
+    } catch (_) {
+        _showFieldMsg('email-update-error', 'email-update-success', true, 'Network error. Please try again.');
+    } finally {
+        btn.disabled = false; btn.textContent = 'Save Email';
+    }
+}
+
+async function handleUpdatePassword(event) {
+    event.preventDefault();
+    const btn         = document.getElementById('password-update-btn');
+    const currentPw   = document.getElementById('current-password').value;
+    const newPw       = document.getElementById('new-password').value;
+    const confirmPw   = document.getElementById('confirm-new-password').value;
+
+    if (newPw !== confirmPw) {
+        _showFieldMsg('password-update-error', 'password-update-success', true, 'New passwords do not match.');
+        return;
+    }
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+        const res = await fetch(
+            `${API_BASE}/api/auth/update-password?current_password=${encodeURIComponent(currentPw)}&new_password=${encodeURIComponent(newPw)}`,
+            { method: 'PUT', headers: { Authorization: `Bearer ${adminToken}` } }
+        );
+        const data = await res.json();
+        if (!res.ok) {
+            _showFieldMsg('password-update-error', 'password-update-success', true, data.detail || 'Update failed');
+        } else {
+            _showFieldMsg('password-update-error', 'password-update-success', false, data.message);
+            document.getElementById('current-password').value = '';
+            document.getElementById('new-password').value = '';
+            document.getElementById('confirm-new-password').value = '';
+        }
+    } catch (_) {
+        _showFieldMsg('password-update-error', 'password-update-success', true, 'Network error. Please try again.');
+    } finally {
+        btn.disabled = false; btn.textContent = 'Save Password';
+    }
 }

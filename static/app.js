@@ -9,6 +9,18 @@ const API_BASE = '/api';
 // ─── Initialization ───────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', async () => {
+    // On first deployment, redirect to the setup wizard before anything else
+    try {
+        const firstRunRes = await fetch(`${API_BASE}/admin/check-first-run`);
+        if (firstRunRes.ok) {
+            const firstRunData = await firstRunRes.json();
+            if (firstRunData.is_first_run) {
+                window.location.href = '/static/setup.html';
+                return;
+            }
+        }
+    } catch (_) {}
+
     await loadAppConfig();
     checkUrlParams();       // ?verify_token= and ?reset_token=
     checkOAuthCallback();   // #oauth_token= fragment
@@ -59,7 +71,7 @@ function showAuth() {
 
 function showApp() {
     document.getElementById('auth-container').style.display = 'none';
-    document.getElementById('app-container').style.display = 'flex';
+    document.getElementById('app-container').style.display = '';
 
     const usernameEl = document.getElementById('username-display');
     if (usernameEl) usernameEl.textContent = currentUser.username;
@@ -72,6 +84,8 @@ function showApp() {
     if (banner && currentUser.email_verified === false) {
         banner.style.cssText = 'display: flex !important;';
     }
+
+    renderDashboard();
 }
 
 function showLogin() {
@@ -533,6 +547,171 @@ function logout() {
     localStorage.removeItem('authToken');
     showAuth();
     showLogin();
+}
+
+// ─── Dashboard Customization ──────────────────────────────────────────────────
+
+let _editingCardId = null;
+
+function _dashboardKey() {
+    return 'dashboardPrefs_' + (currentUser?.username || '_anon');
+}
+
+function _getDashboardPrefs() {
+    try {
+        return JSON.parse(localStorage.getItem(_dashboardKey())) || { hidden: [], customCards: [] };
+    } catch { return { hidden: [], customCards: [] }; }
+}
+
+function _saveDashboardPrefs(prefs) {
+    localStorage.setItem(_dashboardKey(), JSON.stringify(prefs));
+}
+
+function renderDashboard() {
+    const prefs = _getDashboardPrefs();
+
+    // Apply built-in card visibility
+    document.querySelectorAll('[data-card-wrapper]').forEach(el => {
+        el.style.display = prefs.hidden.includes(el.dataset.cardWrapper) ? 'none' : '';
+    });
+
+    // Remove stale custom cards then re-render
+    document.querySelectorAll('[data-custom-card]').forEach(el => el.remove());
+    const row = document.getElementById('dashboard-cards-row');
+    if (row) prefs.customCards.forEach(card => row.insertAdjacentHTML('beforeend', _buildCustomCardCol(card)));
+}
+
+function _buildCustomCardCol(card) {
+    const icon = card.icon ? `<i class="bi ${_escHtml(card.icon)} me-2"></i>` : '';
+    const body = card.body ? `<p class="card-text mb-2">${_escHtml(card.body)}</p>` : '';
+    const link = card.link
+        ? `<a href="${_escHtml(card.link)}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-primary">${_escHtml(card.linkText || 'Open Link')}</a>`
+        : '';
+    const empty = !body && !link ? `<p class="text-muted small mb-0">No content.</p>` : '';
+    return `
+        <div class="col-md-6" data-custom-card="${_escHtml(card.id)}">
+            <div class="card shadow-sm h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>${icon}${_escHtml(card.title)}</span>
+                    <div class="d-flex gap-1">
+                        <button class="btn btn-sm btn-outline-secondary py-0 px-2" title="Edit"
+                                onclick="openEditCard('${_escHtml(card.id)}')"><i class="bi bi-pencil"></i></button>
+                        <button class="btn btn-sm btn-outline-danger py-0 px-2" title="Delete"
+                                onclick="deleteCustomCard('${_escHtml(card.id)}')"><i class="bi bi-trash"></i></button>
+                    </div>
+                </div>
+                <div class="card-body">${body}${link}${empty}</div>
+            </div>
+        </div>`;
+}
+
+function openCustomizePanel() {
+    const prefs = _getDashboardPrefs();
+    // Sync toggle checkboxes
+    ['welcome', 'account-security'].forEach(id => {
+        const el = document.getElementById('toggle-' + id);
+        if (el) el.checked = !prefs.hidden.includes(id);
+    });
+    _renderManageList(prefs);
+    cancelEditCard();
+    const modalEl = document.getElementById('customizeModal');
+    (bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl)).show();
+}
+
+function _renderManageList(prefs) {
+    const list = document.getElementById('custom-cards-manage-list');
+    if (!list) return;
+    if (!prefs.customCards.length) {
+        list.innerHTML = '<p class="text-muted small mb-0">No custom cards yet. Add one below.</p>';
+        return;
+    }
+    list.innerHTML = prefs.customCards.map(c => `
+        <div class="d-flex justify-content-between align-items-center border rounded px-3 py-2 mb-2 bg-white">
+            <span class="small">${c.icon ? `<i class="bi ${_escHtml(c.icon)} me-2 text-muted"></i>` : ''}<strong>${_escHtml(c.title)}</strong></span>
+            <div class="d-flex gap-1">
+                <button class="btn btn-sm btn-outline-secondary py-0" onclick="openEditCard('${_escHtml(c.id)}')"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-outline-danger py-0" onclick="deleteCustomCard('${_escHtml(c.id)}')"><i class="bi bi-trash"></i></button>
+            </div>
+        </div>`).join('');
+}
+
+function toggleBuiltinCard(cardId, visible) {
+    const prefs = _getDashboardPrefs();
+    if (visible) {
+        prefs.hidden = prefs.hidden.filter(id => id !== cardId);
+    } else {
+        if (!prefs.hidden.includes(cardId)) prefs.hidden.push(cardId);
+    }
+    _saveDashboardPrefs(prefs);
+    renderDashboard();
+}
+
+function saveCustomCard() {
+    const title = document.getElementById('card-form-title-input').value.trim();
+    const body  = document.getElementById('card-form-body').value.trim();
+    const icon  = document.getElementById('card-form-icon').value;
+    const link  = document.getElementById('card-form-link').value.trim();
+    const linkText = document.getElementById('card-form-link-text').value.trim();
+    const errEl = document.getElementById('card-form-error');
+
+    errEl.style.display = 'none';
+    if (!title) {
+        errEl.textContent = 'Title is required.';
+        errEl.style.display = 'block';
+        return;
+    }
+
+    const prefs = _getDashboardPrefs();
+    if (_editingCardId) {
+        const card = prefs.customCards.find(c => c.id === _editingCardId);
+        if (card) Object.assign(card, { title, body, icon, link, linkText });
+    } else {
+        prefs.customCards.push({ id: 'card_' + Date.now(), title, body, icon, link, linkText });
+    }
+    _saveDashboardPrefs(prefs);
+    renderDashboard();
+    _renderManageList(prefs);
+    cancelEditCard();
+}
+
+function openEditCard(cardId) {
+    const prefs = _getDashboardPrefs();
+    const card = prefs.customCards.find(c => c.id === cardId);
+    if (!card) return;
+    _editingCardId = cardId;
+    document.getElementById('card-form-title-input').value = card.title || '';
+    document.getElementById('card-form-body').value        = card.body  || '';
+    document.getElementById('card-form-icon').value        = card.icon  || '';
+    document.getElementById('card-form-link').value        = card.link  || '';
+    document.getElementById('card-form-link-text').value   = card.linkText || '';
+    document.getElementById('card-form-link-text-row').style.display = card.link ? '' : 'none';
+    document.getElementById('card-form-heading').textContent = 'Edit Card';
+    document.getElementById('save-card-btn').innerHTML = '<i class="bi bi-check-lg me-1"></i>Save Changes';
+    document.getElementById('cancel-edit-btn').style.display = '';
+    document.getElementById('card-form-error').style.display = 'none';
+    document.getElementById('card-form-heading').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function cancelEditCard() {
+    _editingCardId = null;
+    ['card-form-title-input', 'card-form-body', 'card-form-icon', 'card-form-link', 'card-form-link-text']
+        .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    document.getElementById('card-form-link-text-row').style.display = 'none';
+    document.getElementById('card-form-heading').textContent = 'Add New Card';
+    document.getElementById('save-card-btn').innerHTML = '<i class="bi bi-plus-lg me-1"></i>Add Card';
+    document.getElementById('cancel-edit-btn').style.display = 'none';
+    const errEl = document.getElementById('card-form-error');
+    if (errEl) errEl.style.display = 'none';
+}
+
+function deleteCustomCard(cardId) {
+    if (!confirm('Delete this card?')) return;
+    const prefs = _getDashboardPrefs();
+    prefs.customCards = prefs.customCards.filter(c => c.id !== cardId);
+    _saveDashboardPrefs(prefs);
+    renderDashboard();
+    const modal = document.getElementById('customizeModal');
+    if (modal?.classList.contains('show')) _renderManageList(prefs);
 }
 
 // ─── Utilities ────────────────────────────────────────────────────────────────

@@ -342,6 +342,28 @@ async def revoke_session(
 
 # ─── Account management ───────────────────────────────────────────────────────
 
+@router.put("/update-username")
+async def update_username(
+    new_username: str,
+    current_password: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    import re
+    if not current_user.hashed_password:
+        raise HTTPException(status_code=400, detail="This account uses social login and cannot change username here")
+    if not verify_password(current_password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    if not re.match(r'^[a-zA-Z0-9_]{3,40}$', new_username):
+        raise HTTPException(status_code=400, detail="Username must be 3–40 characters: letters, numbers, and underscores only")
+    result = await db.execute(select(User).where(User.username == new_username))
+    if result.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Username already taken")
+    current_user.username = new_username
+    await db.commit()
+    return {"message": "Username updated successfully"}
+
+
 @router.put("/update-email")
 async def update_email(
     new_email: str,

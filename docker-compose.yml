@@ -20,6 +20,7 @@ services:
       retries: 5
     networks:
       - webapp-network
+    restart: unless-stopped
 
   # FastAPI Application
   web:
@@ -69,7 +70,10 @@ services:
   # Caddy reverse proxy — automatic HTTPS via Let's Encrypt / ACME
   # Set CADDY_DOMAIN to your public domain for auto certificates.
   # Leave unset (defaults to "localhost") for a self-signed dev certificate.
+  # Only active when started with --profile proxy (production).
+  # In dev, use docker-compose.dev.yml override which exposes web directly.
   caddy:
+    profiles: ["proxy"]
     image: caddy:2-alpine
     container_name: webapp-caddy
     environment:

@@ -1,0 +1,11 @@
+# Local development override — bypasses Caddy (no HTTPS needed for localhost testing)
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d
+#
+# The web service is exposed directly on http://localhost:8080 instead of going
+# through Caddy. Caddy is excluded because it uses the "proxy" profile which is
+# not activated by default; start with --profile proxy for production HTTPS.
+
+services:
+  web:
+    ports:
+      - "8080:8000"

@@ -4,16 +4,16 @@ Features are organized into phases by theme. Items within each phase are roughly
 
 ---
 
-## Phase 1 — Authentication & Identity
+## Phase 1 — Authentication & Identity ✅
 
 Strengthen the existing auth system with standard account-security features.
 
-- [ ] **HTTPS support & certificate management** — TLS termination with automatic certificate provisioning (Let's Encrypt / ACME), renewal, and a UI in the admin portal to view certificate status, expiry, trigger manual renewal, and upload or replace custom certificates (PEM/PFX) directly from the UI
-- [ ] **Email verification** — Require users to confirm their email address on registration before accessing the app
-- [ ] **Password reset via email** — "Forgot password" flow with time-limited, single-use reset tokens
-- [ ] **OAuth 2.0 / social login** — Sign in with Google, GitHub, etc. via the `authlib` library
-- [ ] **Two-factor authentication (TOTP)** — Time-based one-time passwords (e.g. Google Authenticator, Authy)
-- [ ] **Active session management** — Let users view and revoke their active JWT sessions from their profile page
+- [x] **HTTPS support & certificate management** — TLS termination with automatic certificate provisioning (Let's Encrypt / ACME), renewal, and a UI in the admin portal to view certificate status, expiry, trigger manual renewal, and upload or replace custom certificates (PEM/PFX) directly from the UI
+- [x] **Email verification** — Require users to confirm their email address on registration before accessing the app
+- [x] **Password reset via email** — "Forgot password" flow with time-limited, single-use reset tokens
+- [x] **OAuth 2.0 / social login** — Sign in with Google, GitHub, etc. via the `authlib` library
+- [x] **Two-factor authentication (TOTP)** — Time-based one-time passwords (e.g. Google Authenticator, Authy)
+- [x] **Active session management** — Let users view and revoke their active JWT sessions from their profile page
 
 ---
 
@@ -109,3 +109,11 @@ Modernize and expand the frontend options.
 | Docker & Docker Compose support | v1.0.0 |
 | Kubernetes manifests + Minikube deploy script | v1.0.0 |
 | Light / Dark / System theme | v1.0.0 |
+| HTTPS support & certificate management (Caddy + admin UI) | v1.1.0 |
+| Email verification (registration flow) | v1.1.0 |
+| Password reset via email (forgot-password flow) | v1.1.0 |
+| OAuth 2.0 / social login (Google, GitHub) | v1.1.0 |
+| Two-factor authentication — TOTP | v1.1.0 |
+| Active session management (view & revoke JWT sessions) | v1.1.0 |
+| Customizable user dashboard (show/hide cards, custom cards) | v1.1.0 |
+| Administrator account self-editing (username, email, password) | v1.1.0 |
