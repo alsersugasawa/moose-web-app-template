@@ -1,0 +1,18 @@
+# Caddy reverse proxy with automatic HTTPS via Let's Encrypt / ACME
+# Set CADDY_DOMAIN and CADDY_EMAIL environment variables in docker-compose.yml
+
+{$CADDY_DOMAIN:localhost} {
+    # Reverse proxy all traffic to the FastAPI app
+    reverse_proxy web:8000
+
+    # Use Let's Encrypt for automatic TLS (ACME)
+    # Falls back to a self-signed cert when domain is "localhost"
+    tls {$CADDY_EMAIL:admin@example.com}
+
+    # Enable access logging
+    log {
+        output stderr
+        format console
+        level INFO
+    }
+}

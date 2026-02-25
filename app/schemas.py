@@ -21,6 +21,7 @@ class UserResponse(BaseModel):
     is_admin: bool
     is_active: bool
     onboarding_completed: bool
+    email_verified: bool
     last_login: Optional[datetime] = None
     created_at: datetime
 
@@ -31,6 +32,7 @@ class UserResponse(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
+    totp_required: bool = False
 
 
 # Admin Schemas
@@ -58,6 +60,7 @@ class AdminUserResponse(BaseModel):
     permissions: Optional[Dict[str, Any]] = None
     last_login: Optional[datetime] = None
     onboarding_completed: bool
+    email_verified: bool
     created_at: datetime
     updated_at: datetime
 
@@ -103,7 +106,6 @@ class DashboardStats(BaseModel):
     app_version: str
     uptime: str
     database_size: Optional[str] = None
-    # System resources
     cpu_percent: float
     cpu_cores: int
     cpu_speed: str
@@ -123,3 +125,73 @@ class AdminSetup(BaseModel):
     username: str
     email: EmailStr
     password: str
+
+
+# ─── Phase 1: Email verification ─────────────────────────────────────────────
+
+class VerifyEmailRequest(BaseModel):
+    token: str
+
+
+class ResendVerificationRequest(BaseModel):
+    pass  # uses auth token from header
+
+
+# ─── Phase 1: Password reset ─────────────────────────────────────────────────
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+
+# ─── Phase 1: TOTP ───────────────────────────────────────────────────────────
+
+class TotpSetupResponse(BaseModel):
+    secret: str
+    qr_code: str  # data URI (data:image/png;base64,...)
+
+
+class TotpVerifyRequest(BaseModel):
+    token: str   # the pending JWT
+    code: str    # 6-digit TOTP code
+
+
+class TotpCodeRequest(BaseModel):
+    code: str    # 6-digit TOTP code
+
+
+# ─── Phase 1: Session management ─────────────────────────────────────────────
+
+class SessionResponse(BaseModel):
+    id: str
+    device_info: Optional[str] = None
+    ip_address: Optional[str] = None
+    created_at: datetime
+    last_used: datetime
+    expires_at: datetime
+    is_revoked: bool
+
+    class Config:
+        from_attributes = True
+
+
+# ─── Phase 1: Certificate management ─────────────────────────────────────────
+
+class CertStatus(BaseModel):
+    present: bool
+    subject: Optional[str] = None
+    issuer: Optional[str] = None
+    not_valid_before: Optional[str] = None
+    not_valid_after: Optional[str] = None
+    days_remaining: Optional[int] = None
+    is_expired: Optional[bool] = None
+    serial_number: Optional[str] = None
+
+
+class CertUploadResponse(BaseModel):
+    message: str
+    cert_info: CertStatus

@@ -149,6 +149,8 @@ body {
 .app-container {
     background: var(--bg-main);
     min-height: 100vh;
+    display: flex;
+    flex-direction: column;
 }
 
 .app-header {
@@ -299,20 +301,6 @@ body {
     background: #5a6268;
 }
 
-/* Family Summary */
-.family-summary {
-    margin: 20px 40px;
-    background: var(--bg-main);
-    padding: 20px;
-    border-radius: 10px;
-    box-shadow: 0 2px 10px var(--shadow);
-}
-
-.family-summary h3 {
-    margin: 0 0 15px 0;
-    color: var(--text-primary);
-    font-size: 18px;
-}
 
 .summary-stats {
     display: flex;

@@ -70,6 +70,12 @@ function showSection(sectionName) {
             loadBackupConfig();
             loadBackups();
             break;
+        case 'certificates':
+            loadCertStatus();
+            break;
+        case 'myaccount':
+            loadMyAccount();
+            break;
     }
 }
 
@@ -96,10 +102,8 @@ async function loadDashboard() {
         // Update stats
         document.getElementById('stat-total-users').textContent = data.total_users;
         document.getElementById('stat-active-users').textContent = data.active_users;
-        document.getElementById('stat-web-platforms').textContent = data.total_web_platforms;
-        document.getElementById('stat-family-members').textContent = data.total_family_members;
-        document.getElementById('stat-tree-views').textContent = data.total_tree_views;
-        document.getElementById('stat-tree-shares').textContent = data.total_tree_shares;
+        document.getElementById('stat-db-size').textContent = data.database_size || '—';
+        document.getElementById('stat-uptime').textContent = data.uptime || '—';
 
         // Update system resources with color coding
         updateResourceValue('system-cpu-percent', data.cpu_percent, '%');
@@ -546,8 +550,7 @@ function updateBackupTypeInfo() {
             <strong>Database Backup includes:</strong>
             <ul style="margin: 5px 0 0 20px;">
                 <li>All users and authentication data</li>
-                <li>Family trees and members</li>
-                <li>Tree shares and permissions</li>
+                <li>Application data and records</li>
                 <li>System logs and backups metadata</li>
             </ul>
         `,
@@ -565,7 +568,7 @@ function updateBackupTypeInfo() {
         'full': `
             <strong>Full Backup includes:</strong>
             <ul style="margin: 5px 0 0 20px;">
-                <li><strong>Database:</strong> All user data, trees, and system logs</li>
+                <li><strong>Database:</strong> All user data and system logs</li>
                 <li><strong>Configuration:</strong> App settings and Docker config</li>
             </ul>
             <em style="color: #28a745;">Recommended for complete system backup</em>
@@ -1356,4 +1359,246 @@ if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initializeTheme);
 } else {
     initializeTheme();
+}
+
+// ─── Certificate Management ───────────────────────────────────────────────────
+
+async function loadCertStatus() {
+    const body = document.getElementById('cert-status-body');
+    if (!body) return;
+    body.innerHTML = '<p class="text-muted">Loading…</p>';
+    try {
+        const res = await fetch(`${API_BASE}/api/admin/certs`, {
+            headers: { Authorization: `Bearer ${adminToken}` }
+        });
+        if (!res.ok) { body.innerHTML = '<p class="text-danger">Failed to load certificate status.</p>'; return; }
+        const d = await res.json();
+        if (!d.present) {
+            body.innerHTML = '<p class="text-muted"><i class="bi bi-x-circle text-secondary me-2"></i>No custom certificate installed. Caddy is using its automatic ACME certificate.</p>';
+            return;
+        }
+        const daysClass = d.is_expired ? 'text-danger' : (d.days_remaining < 30 ? 'text-warning' : 'text-success');
+        body.innerHTML = `
+            <table class="table table-sm mb-0">
+                <tr><th>Subject</th><td>${_adminEscHtml(d.subject || '—')}</td></tr>
+                <tr><th>Issuer</th><td>${_adminEscHtml(d.issuer || '—')}</td></tr>
+                <tr><th>Valid From</th><td>${d.not_valid_before || '—'}</td></tr>
+                <tr><th>Expires</th><td>${d.not_valid_after || '—'}</td></tr>
+                <tr><th>Days Remaining</th><td class="${daysClass} fw-semibold">${d.is_expired ? 'EXPIRED' : d.days_remaining}</td></tr>
+                <tr><th>Serial</th><td class="text-muted small">${d.serial_number || '—'}</td></tr>
+            </table>`;
+    } catch (_) {
+        body.innerHTML = '<p class="text-danger">Network error.</p>';
+    }
+}
+
+async function uploadCert(event) {
+    event.preventDefault();
+    const certFile = document.getElementById('cert-file-input').files[0];
+    const keyFile = document.getElementById('key-file-input').files[0];
+    const passphrase = document.getElementById('pfx-passphrase-input').value;
+    const errEl = document.getElementById('cert-upload-error');
+    const successEl = document.getElementById('cert-upload-success');
+    errEl.textContent = '';
+    successEl.style.display = 'none';
+
+    if (!certFile) { errEl.textContent = 'Please select a certificate file.'; return; }
+
+    const formData = new FormData();
+    formData.append('cert_file', certFile);
+    if (keyFile) formData.append('key_file', keyFile);
+    if (passphrase) formData.append('passphrase', passphrase);
+
+    try {
+        const res = await fetch(`${API_BASE}/api/admin/certs/upload`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${adminToken}` },
+            body: formData
+        });
+        const data = await res.json();
+        if (res.ok) {
+            successEl.textContent = data.message || 'Certificate uploaded successfully.';
+            successEl.style.display = 'block';
+            await loadCertStatus();
+        } else {
+            errEl.textContent = data.detail || 'Upload failed.';
+        }
+    } catch (_) {
+        errEl.textContent = 'Network error.';
+    }
+}
+
+async function triggerCertRenewal() {
+    const resultEl = document.getElementById('cert-action-result');
+    resultEl.textContent = 'Triggering renewal…';
+    try {
+        const res = await fetch(`${API_BASE}/api/admin/certs/renew`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${adminToken}` }
+        });
+        const data = await res.json();
+        resultEl.textContent = data.message || 'Done.';
+    } catch (_) {
+        resultEl.textContent = 'Network error.';
+    }
+}
+
+async function removeCustomCert() {
+    if (!confirm('Remove the custom certificate? Caddy will fall back to its automatic ACME certificate.')) return;
+    const resultEl = document.getElementById('cert-action-result');
+    resultEl.textContent = 'Removing…';
+    try {
+        const res = await fetch(`${API_BASE}/api/admin/certs`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${adminToken}` }
+        });
+        const data = await res.json();
+        resultEl.textContent = data.message || 'Done.';
+        await loadCertStatus();
+    } catch (_) {
+        resultEl.textContent = 'Network error.';
+    }
+}
+
+// Show/hide PFX passphrase field based on file selection
+document.addEventListener('DOMContentLoaded', () => {
+    const certInput = document.getElementById('cert-file-input');
+    if (certInput) {
+        certInput.addEventListener('change', () => {
+            const name = (certInput.files[0]?.name || '').toLowerCase();
+            const isPfx = name.endsWith('.pfx') || name.endsWith('.p12');
+            document.getElementById('key-file-row').style.display = isPfx ? 'none' : '';
+            document.getElementById('pfx-passphrase-row').style.display = isPfx ? '' : 'none';
+        });
+    }
+});
+
+function _adminEscHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ─── My Account ───────────────────────────────────────────────────────────────
+
+async function loadMyAccount() {
+    try {
+        const res = await fetch(`${API_BASE}/api/auth/me`, {
+            headers: { Authorization: `Bearer ${adminToken}` }
+        });
+        if (!res.ok) throw new Error('Failed to load account');
+        const me = await res.json();
+
+        document.getElementById('myacct-username').textContent   = me.username || '—';
+        document.getElementById('myacct-email').textContent      = me.email    || '—';
+        document.getElementById('myacct-verified').innerHTML     = me.email_verified
+            ? '<span style="color:#27ae60">✔ Verified</span>'
+            : '<span style="color:#e74c3c">✘ Not verified</span>';
+        document.getElementById('myacct-role').textContent       = me.is_admin ? 'Administrator' : 'User';
+        document.getElementById('myacct-last-login').textContent = me.last_login ? new Date(me.last_login).toLocaleString() : 'Never';
+        document.getElementById('myacct-created').textContent    = me.created_at ? new Date(me.created_at).toLocaleString() : '—';
+    } catch (err) {
+        console.error('loadMyAccount:', err);
+    }
+}
+
+function _showFieldMsg(errorId, successId, isError, msg) {
+    const errEl = document.getElementById(errorId);
+    const okEl  = document.getElementById(successId);
+    if (isError) {
+        errEl.textContent = msg; errEl.style.display = '';
+        okEl.style.display = 'none';
+    } else {
+        okEl.textContent = msg; okEl.style.display = '';
+        errEl.style.display = 'none';
+    }
+}
+
+async function handleUpdateUsername(event) {
+    event.preventDefault();
+    const btn = document.getElementById('username-update-btn');
+    const newUsername = document.getElementById('new-username').value.trim();
+    const password    = document.getElementById('username-current-password').value;
+
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+        const res = await fetch(
+            `${API_BASE}/api/auth/update-username?new_username=${encodeURIComponent(newUsername)}&current_password=${encodeURIComponent(password)}`,
+            { method: 'PUT', headers: { Authorization: `Bearer ${adminToken}` } }
+        );
+        const data = await res.json();
+        if (!res.ok) {
+            _showFieldMsg('username-update-error', 'username-update-success', true, data.detail || 'Update failed');
+        } else {
+            _showFieldMsg('username-update-error', 'username-update-success', false, data.message);
+            document.getElementById('new-username').value = '';
+            document.getElementById('username-current-password').value = '';
+            // Refresh the overview and the nav username display
+            document.getElementById('admin-username').textContent = newUsername;
+            await loadMyAccount();
+        }
+    } catch (_) {
+        _showFieldMsg('username-update-error', 'username-update-success', true, 'Network error. Please try again.');
+    } finally {
+        btn.disabled = false; btn.textContent = 'Save Username';
+    }
+}
+
+async function handleUpdateEmail(event) {
+    event.preventDefault();
+    const btn      = document.getElementById('email-update-btn');
+    const newEmail = document.getElementById('new-email').value.trim();
+
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+        const res = await fetch(
+            `${API_BASE}/api/auth/update-email?new_email=${encodeURIComponent(newEmail)}`,
+            { method: 'PUT', headers: { Authorization: `Bearer ${adminToken}` } }
+        );
+        const data = await res.json();
+        if (!res.ok) {
+            _showFieldMsg('email-update-error', 'email-update-success', true, data.detail || 'Update failed');
+        } else {
+            _showFieldMsg('email-update-error', 'email-update-success', false, data.message);
+            document.getElementById('new-email').value = '';
+            await loadMyAccount();
+        }
+    } catch (_) {
+        _showFieldMsg('email-update-error', 'email-update-success', true, 'Network error. Please try again.');
+    } finally {
+        btn.disabled = false; btn.textContent = 'Save Email';
+    }
+}
+
+async function handleUpdatePassword(event) {
+    event.preventDefault();
+    const btn         = document.getElementById('password-update-btn');
+    const currentPw   = document.getElementById('current-password').value;
+    const newPw       = document.getElementById('new-password').value;
+    const confirmPw   = document.getElementById('confirm-new-password').value;
+
+    if (newPw !== confirmPw) {
+        _showFieldMsg('password-update-error', 'password-update-success', true, 'New passwords do not match.');
+        return;
+    }
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+        const res = await fetch(
+            `${API_BASE}/api/auth/update-password?current_password=${encodeURIComponent(currentPw)}&new_password=${encodeURIComponent(newPw)}`,
+            { method: 'PUT', headers: { Authorization: `Bearer ${adminToken}` } }
+        );
+        const data = await res.json();
+        if (!res.ok) {
+            _showFieldMsg('password-update-error', 'password-update-success', true, data.detail || 'Update failed');
+        } else {
+            _showFieldMsg('password-update-error', 'password-update-success', false, data.message);
+            document.getElementById('current-password').value = '';
+            document.getElementById('new-password').value = '';
+            document.getElementById('confirm-new-password').value = '';
+        }
+    } catch (_) {
+        _showFieldMsg('password-update-error', 'password-update-success', true, 'Network error. Please try again.');
+    } finally {
+        btn.disabled = false; btn.textContent = 'Save Password';
+    }
 }

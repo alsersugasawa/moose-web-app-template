@@ -11,11 +11,15 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
 # Install system dependencies
+# libpng-dev, libjpeg-dev, zlib1g-dev: required by Pillow (TOTP QR code generation)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     gcc \
     python3-dev \
     postgresql-client \
+    libpng-dev \
+    libjpeg-dev \
+    zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
@@ -29,8 +33,8 @@ COPY ./app ./app
 COPY ./static ./static
 COPY ./migrations ./migrations
 
-# Create backups directory (profile pictures now stored in database)
-RUN mkdir -p /app/backups
+# Create runtime directories
+RUN mkdir -p /app/backups /app/certs
 
 # Create a non-root user
 RUN useradd -m -u 1000 appuser && \

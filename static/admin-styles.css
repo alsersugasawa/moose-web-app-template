@@ -1029,3 +1029,30 @@ body {
         grid-template-columns: 1fr;
     }
 }
+
+/* My Account section */
+.error-msg {
+    color: #e74c3c;
+    font-size: 13px;
+    margin-bottom: 10px;
+    padding: 8px 12px;
+    background: #fdf0ef;
+    border-left: 3px solid #e74c3c;
+    border-radius: 4px;
+}
+
+.success-msg {
+    color: #27ae60;
+    font-size: 13px;
+    margin-bottom: 10px;
+    padding: 8px 12px;
+    background: #edfaf2;
+    border-left: 3px solid #27ae60;
+    border-radius: 4px;
+}
+
+@media (max-width: 900px) {
+    #myaccount-section > div[style*="grid-template-columns"] {
+        grid-template-columns: 1fr !important;
+    }
+}
