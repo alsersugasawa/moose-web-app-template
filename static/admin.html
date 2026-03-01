@@ -23,6 +23,7 @@
             <a href="#logs" class="nav-link" onclick="showSection('logs')">Logs</a>
             <a href="#backups" class="nav-link" onclick="showSection('backups')">Backups</a>
             <a href="#certificates" class="nav-link" onclick="showSection('certificates')">Certificates</a>
+            <a href="#invitations" class="nav-link" onclick="showSection('invitations')">Invitations</a>
             <a href="#myaccount" class="nav-link" onclick="showSection('myaccount')">My Account</a>
             <a href="#about" class="nav-link" onclick="showSection('about')">About</a>
         </div>
@@ -258,7 +259,9 @@
                     <tr>
                         <th>ID</th>
                         <th>Username</th>
+                        <th>Display Name</th>
                         <th>Email</th>
+                        <th>Role</th>
                         <th>Admin</th>
                         <th>Active</th>
                         <th>Last Login</th>
@@ -267,7 +270,7 @@
                 </thead>
                 <tbody id="users-table-body">
                     <tr>
-                        <td colspan="7" class="text-center">Loading...</td>
+                        <td colspan="9" class="text-center">Loading...</td>
                     </tr>
                 </tbody>
             </table>
@@ -554,6 +557,12 @@
                         Active
                     </label>
                 </div>
+                <div class="form-group">
+                    <label>Role</label>
+                    <select id="edit-user-role">
+                        <option value="0">— No Role —</option>
+                    </select>
+                </div>
                 <div class="form-actions">
                     <button type="button" onclick="closeEditUserModal()" class="btn-secondary">Cancel</button>
                     <button type="submit" class="btn-primary">Save Changes</button>
@@ -802,6 +811,71 @@
                 </button>
             </div>
             <div class="card-footer text-muted small" id="cert-action-result"></div>
+        </div>
+    </div>
+
+    <!-- Invitations Section -->
+    <div id="invitations-section" class="content-section">
+        <div class="section-header">
+            <h2>Invitations</h2>
+            <button onclick="showCreateInvitationModal()" class="btn-primary">+ Create Invitation</button>
+        </div>
+        <div id="invite-only-banner" class="alert" style="display:none; background:#e8f4f8; border-left:4px solid #3498db; padding:10px 14px; margin-bottom:16px; border-radius:4px; font-size:13px;">
+            Invite-only registration is <strong>active</strong> — new users must use an invitation link to register.
+        </div>
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Email</th>
+                        <th>Status</th>
+                        <th>Expires</th>
+                        <th>Created</th>
+                        <th>Used At</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="invitations-table-body">
+                    <tr><td colspan="6" class="text-center">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Create Invitation Modal -->
+    <div id="create-invitation-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Create Invitation</h3>
+                <button onclick="closeCreateInvitationModal()" class="btn-close">&times;</button>
+            </div>
+            <div id="invitation-link-result" style="display:none;" class="mb-3">
+                <p style="font-size:13px; font-weight:600;">Invitation link (send to user):</p>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <input type="text" id="invitation-link-value" style="flex:1; font-family:monospace; font-size:12px;" readonly>
+                    <button type="button" class="btn-secondary" onclick="copyInvitationLinkFromInput()" id="copy-invite-btn">Copy</button>
+                </div>
+            </div>
+            <form id="create-invitation-form" onsubmit="handleCreateInvitation(event)">
+                <div class="form-group">
+                    <label>Email (optional — pre-fills the registration form)</label>
+                    <input type="email" id="invitation-email" placeholder="user@example.com">
+                </div>
+                <div class="form-group">
+                    <label>Expires In</label>
+                    <select id="invitation-expires">
+                        <option value="24">24 hours</option>
+                        <option value="72" selected>3 days</option>
+                        <option value="168">7 days</option>
+                        <option value="720">30 days</option>
+                    </select>
+                </div>
+                <div id="invitation-form-error" class="error-msg" style="display:none;"></div>
+                <div class="form-actions">
+                    <button type="button" onclick="closeCreateInvitationModal()" class="btn-secondary">Close</button>
+                    <button type="submit" class="btn-primary" id="create-invitation-submit-btn">Create</button>
+                </div>
+            </form>
         </div>
     </div>
 

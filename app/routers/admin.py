@@ -15,15 +15,17 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 import base64
 from app.database import get_db
-from app.models import User, SystemLog, Backup, AppConfig
+from app.models import User, SystemLog, Backup, AppConfig, Role
 from app.schemas import (
-    AdminUserCreate, AdminUserUpdate, AdminUserResponse,
+    AdminUserCreate, AdminUserUpdate, AdminUserUpdateV2,
+    AdminUserResponse, AdminUserResponseV2,
     SystemLogResponse, BackupCreate, BackupResponse,
     DashboardStats, AdminSetup
 )
 from app.auth import (
     get_current_admin_user, get_password_hash, check_first_run
 )
+from app.permissions import require_permission
 from app.config import backup_settings
 from pydantic import BaseModel
 
@@ -77,8 +79,10 @@ async def get_app_config(db: AsyncSession = Depends(get_db)):
     app_name_config = result.scalar_one_or_none()
     app_name = app_name_config.value if app_name_config else "Web Platform"
 
+    invite_only = os.getenv("INVITE_ONLY", "false").lower() == "true"
     return {
-        "app_name": app_name
+        "app_name": app_name,
+        "invite_only": invite_only,
     }
 
 
@@ -244,19 +248,40 @@ async def get_dashboard_stats(
 
 
 # User Management
-@router.get("/users", response_model=List[AdminUserResponse])
+@router.get("/users", response_model=List[AdminUserResponseV2])
 async def list_users(
     skip: int = 0,
     limit: int = 100,
-    current_admin: User = Depends(get_current_admin_user),
+    current_user: User = Depends(require_permission("users:read")),
     db: AsyncSession = Depends(get_db)
 ):
     """List all users"""
+    from sqlalchemy.orm import selectinload
     result = await db.execute(
-        select(User).offset(skip).limit(limit).order_by(User.created_at.desc())
+        select(User)
+        .options(selectinload(User.role))
+        .offset(skip).limit(limit).order_by(User.created_at.desc())
     )
     users = result.scalars().all()
-    return users
+    return [
+        AdminUserResponseV2(
+            id=u.id,
+            username=u.username,
+            email=u.email,
+            is_admin=u.is_admin,
+            is_active=u.is_active,
+            permissions=u.permissions,
+            last_login=u.last_login,
+            onboarding_completed=u.onboarding_completed,
+            email_verified=u.email_verified,
+            created_at=u.created_at,
+            updated_at=u.updated_at,
+            role_id=u.role_id,
+            role=u.role,
+            display_name=u.display_name,
+        )
+        for u in users
+    ]
 
 
 @router.post("/users", response_model=AdminUserResponse)
@@ -311,7 +336,7 @@ async def create_user(
 @router.put("/users/{user_id}", response_model=AdminUserResponse)
 async def update_user(
     user_id: int,
-    user_data: AdminUserUpdate,
+    user_data: AdminUserUpdateV2,
     request: Request,
     current_admin: User = Depends(get_current_admin_user),
     db: AsyncSession = Depends(get_db)
@@ -335,7 +360,6 @@ async def update_user(
 
     # Update fields
     if user_data.email is not None:
-        # Check email uniqueness
         email_check = await db.execute(
             select(User).where(User.email == user_data.email, User.id != user_id)
         )
@@ -354,6 +378,16 @@ async def update_user(
 
     if user_data.permissions is not None:
         user.permissions = user_data.permissions
+
+    # Role assignment: 0 clears the role, positive int assigns it
+    if user_data.role_id is not None:
+        if user_data.role_id == 0:
+            user.role_id = None
+        else:
+            role_check = await db.execute(select(Role).where(Role.id == user_data.role_id))
+            if not role_check.scalar_one_or_none():
+                raise HTTPException(status_code=400, detail="Role not found.")
+            user.role_id = user_data.role_id
 
     user.updated_at = datetime.utcnow()
     await db.commit()
@@ -414,7 +448,7 @@ async def get_logs(
     skip: int = 0,
     limit: int = 100,
     level: str = None,
-    current_admin: User = Depends(get_current_admin_user),
+    current_user: User = Depends(require_permission("logs:read")),
     db: AsyncSession = Depends(get_db)
 ):
     """Get system logs"""
@@ -433,7 +467,7 @@ async def get_logs(
 # Backups
 @router.get("/backups", response_model=List[BackupResponse])
 async def list_backups(
-    current_admin: User = Depends(get_current_admin_user),
+    current_user: User = Depends(require_permission("backups:read")),
     db: AsyncSession = Depends(get_db)
 ):
     """List all backups"""
@@ -738,7 +772,7 @@ def create_config_backup(filepath: str) -> dict:
 async def create_backup(
     backup_data: BackupCreate,
     request: Request,
-    current_admin: User = Depends(get_current_admin_user),
+    current_admin: User = Depends(require_permission("backups:write")),
     db: AsyncSession = Depends(get_db)
 ):
     """Create a new backup to local disk and configured file shares"""
@@ -1097,7 +1131,7 @@ async def restore_backup(
 
 @router.get("/system-info")
 async def get_system_info(
-    current_admin: User = Depends(get_current_admin_user)
+    current_user: User = Depends(require_permission("system:read"))
 ):
     """Get system information"""
     try:

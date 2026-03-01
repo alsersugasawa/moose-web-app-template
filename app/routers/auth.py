@@ -1,21 +1,23 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 from datetime import datetime, timedelta
 from typing import Optional
 import uuid as uuid_module
+import os
+import secrets
 
 from app.database import get_db
 from app.models import User, PasswordResetToken, UserSession
 from app.schemas import (
-    UserCreate, UserLogin, UserResponse, Token,
+    UserCreate, UserCreateV2, UserLogin, UserResponse, UserResponseV2, Token,
     ForgotPasswordRequest, ResetPasswordRequest,
     TotpSetupResponse, TotpVerifyRequest, TotpCodeRequest,
-    SessionResponse,
+    SessionResponse, ProfileUpdate, ProfileResponse,
 )
 from app.auth import (
     get_password_hash, verify_password,
-    create_access_token, get_current_user,
+    create_access_token, get_current_user, get_current_active_user,
     record_session, ACCESS_TOKEN_EXPIRE_MINUTES,
     SECRET_KEY, ALGORITHM,
 )
@@ -30,7 +32,12 @@ TOTP_PENDING_EXPIRE_MINUTES = 5
 # ─── Registration ─────────────────────────────────────────────────────────────
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
+async def register(user_data: UserCreateV2, db: AsyncSession = Depends(get_db)):
+    # Invite-only mode check
+    invite_only = os.getenv("INVITE_ONLY", "false").lower() == "true"
+    if invite_only and not user_data.invite_token:
+        raise HTTPException(status_code=400, detail="An invitation token is required to register.")
+
     result = await db.execute(select(User).where(User.username == user_data.username))
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Username already registered")
@@ -52,6 +59,17 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
     db.add(new_user)
     await db.commit()
     await db.refresh(new_user)
+
+    # Consume invite token after the user is created
+    if user_data.invite_token:
+        from app.routers.invitations import validate_and_consume_invite
+        try:
+            await validate_and_consume_invite(user_data.invite_token, new_user.id, db)
+        except HTTPException:
+            # Roll back the new user if token is invalid
+            await db.delete(new_user)
+            await db.commit()
+            raise
 
     await send_verification_email(new_user.email, new_user.username, verification_token)
     return new_user
@@ -97,9 +115,36 @@ async def login(user_data: UserLogin, request: Request, db: AsyncSession = Depen
 
 # ─── Current user ─────────────────────────────────────────────────────────────
 
-@router.get("/me", response_model=UserResponse)
-async def get_current_user_info(current_user: User = Depends(get_current_user)):
-    return current_user
+@router.get("/me", response_model=UserResponseV2)
+async def get_current_user_info(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    # Eager-load role if needed
+    if current_user.role_id and current_user.role is None:
+        from app.models import Role
+        from sqlalchemy import select as sa_select
+        r = await db.execute(sa_select(Role).where(Role.id == current_user.role_id))
+        current_user.role = r.scalar_one_or_none()
+
+    from app.permissions import get_effective_permissions
+    effective = list(get_effective_permissions(current_user))
+
+    return UserResponseV2(
+        id=current_user.id,
+        username=current_user.username,
+        email=current_user.email,
+        is_admin=current_user.is_admin,
+        is_active=current_user.is_active,
+        onboarding_completed=current_user.onboarding_completed,
+        email_verified=current_user.email_verified,
+        last_login=current_user.last_login,
+        created_at=current_user.created_at,
+        role=current_user.role.name if current_user.role else None,
+        display_name=current_user.display_name,
+        avatar_path=current_user.avatar_path,
+        permissions_effective=effective,
+    )
 
 
 # ─── Email verification ───────────────────────────────────────────────────────
@@ -412,6 +457,99 @@ async def delete_account(
     await db.delete(current_user)
     await db.commit()
     return {"message": "Account deleted successfully"}
+
+
+# ─── Profile ──────────────────────────────────────────────────────────────────
+
+_AVATAR_DIR = "static/avatars"
+_MAX_AVATAR_BYTES = 2 * 1024 * 1024  # 2 MB
+_ALLOWED_AVATAR_TYPES = {"image/jpeg", "image/png", "image/webp"}
+
+
+@router.get("/profile", response_model=ProfileResponse)
+async def get_profile(
+    current_user: User = Depends(get_current_active_user),
+):
+    return ProfileResponse(
+        id=current_user.id,
+        username=current_user.username,
+        display_name=current_user.display_name,
+        bio=current_user.bio,
+        avatar_path=current_user.avatar_path,
+        timezone=current_user.timezone,
+        language=current_user.language,
+    )
+
+
+@router.put("/profile", response_model=ProfileResponse)
+async def update_profile(
+    data: ProfileUpdate,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if data.display_name is not None:
+        current_user.display_name = data.display_name.strip() or None
+    if data.bio is not None:
+        current_user.bio = data.bio.strip() or None
+    if data.timezone is not None:
+        current_user.timezone = data.timezone
+    if data.language is not None:
+        current_user.language = data.language
+    await db.commit()
+    return ProfileResponse(
+        id=current_user.id,
+        username=current_user.username,
+        display_name=current_user.display_name,
+        bio=current_user.bio,
+        avatar_path=current_user.avatar_path,
+        timezone=current_user.timezone,
+        language=current_user.language,
+    )
+
+
+@router.post("/profile/avatar")
+async def upload_avatar(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if file.content_type not in _ALLOWED_AVATAR_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail="Only JPEG, PNG, and WebP images are allowed.",
+        )
+    contents = await file.read()
+    if len(contents) > _MAX_AVATAR_BYTES:
+        raise HTTPException(status_code=400, detail="Image must be 2 MB or smaller.")
+
+    from PIL import Image
+    import io
+
+    try:
+        img = Image.open(io.BytesIO(contents))
+        img.thumbnail((200, 200))
+        img = img.convert("RGB")  # normalise to JPEG-compatible
+    except Exception:
+        raise HTTPException(status_code=400, detail="Could not process image.")
+
+    os.makedirs(_AVATAR_DIR, exist_ok=True)
+
+    # Delete old avatar if present
+    if current_user.avatar_path:
+        old_path = current_user.avatar_path.lstrip("/")
+        if os.path.exists(old_path):
+            try:
+                os.remove(old_path)
+            except OSError:
+                pass
+
+    filename = f"{current_user.id}_{secrets.token_hex(8)}.jpg"
+    save_path = os.path.join(_AVATAR_DIR, filename)
+    img.save(save_path, format="JPEG", quality=85)
+
+    current_user.avatar_path = f"/static/avatars/{filename}"
+    await db.commit()
+    return {"avatar_path": current_user.avatar_path}
 
 
 # ─── Internal helpers ─────────────────────────────────────────────────────────

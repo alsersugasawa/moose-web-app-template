@@ -5,12 +5,12 @@ import secrets
 import uuid as uuid_module
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Header
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.database import get_db
-from app.models import User, UserSession
+from app.models import User, UserSession, ApiKey
 
 # Security Configuration - ISO 27001 A.9.4.3, NIST SP 800-53 IA-5, OWASP ASVS 2.6.3
 def get_secret_key() -> str:
@@ -35,7 +35,8 @@ pwd_context = CryptContext(
     deprecated="auto",
     bcrypt__rounds=12
 )
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
+# auto_error=False so 401 isn't raised before the X-API-Key path runs
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login", auto_error=False)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -67,7 +68,8 @@ def create_access_token(
 
 
 async def get_current_user(
-    token: str = Depends(oauth2_scheme),
+    token: Optional[str] = Depends(oauth2_scheme),
+    api_key_header: Optional[str] = Header(None, alias="X-API-Key"),
     db: AsyncSession = Depends(get_db),
 ) -> User:
     credentials_exception = HTTPException(
@@ -75,6 +77,43 @@ async def get_current_user(
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
+    # ── API Key path ──────────────────────────────────────────────────────────
+    if api_key_header:
+        if not api_key_header.startswith("mpk_") or len(api_key_header) < 10:
+            raise credentials_exception
+        prefix = api_key_header[:10]
+        keys_result = await db.execute(
+            select(ApiKey).where(
+                ApiKey.key_prefix == prefix,
+                ApiKey.is_active == True,
+            )
+        )
+        candidates = keys_result.scalars().all()
+        matched_key: Optional[ApiKey] = None
+        for candidate in candidates:
+            if verify_password(api_key_header, candidate.key_hash):
+                matched_key = candidate
+                break
+        if matched_key is None:
+            raise credentials_exception
+        # Check expiry
+        if matched_key.expires_at and matched_key.expires_at < datetime.utcnow():
+            raise credentials_exception
+        # Update last_used (throttled)
+        if not matched_key.last_used or (datetime.utcnow() - matched_key.last_used).total_seconds() > 60:
+            matched_key.last_used = datetime.utcnow()
+            await db.commit()
+        user_result = await db.execute(select(User).where(User.id == matched_key.user_id))
+        user = user_result.scalar_one_or_none()
+        if user is None or not user.is_active:
+            raise credentials_exception
+        return user
+
+    # ── JWT path ──────────────────────────────────────────────────────────────
+    if not token:
+        raise credentials_exception
+
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
