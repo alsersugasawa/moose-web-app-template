@@ -627,28 +627,10 @@ body {
     cursor: pointer;
 }
 
-/* Modal */
-.modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 2000;
-}
+/* Modal — custom legacy rules removed; Bootstrap 5.3 handles .modal display/layout */
 
 .modal-content {
     background: var(--modal-bg);
-    padding: 0;
-    border-radius: 10px;
-    width: 90%;
-    max-width: 600px;
-    max-height: 90vh;
-    overflow-y: auto;
 }
 
 .modal-header {
