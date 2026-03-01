@@ -9,6 +9,9 @@ import os
 from app.database import init_db
 from app.routers import auth, admin
 from app.routers import oauth as oauth_router
+from app.routers import roles as roles_router
+from app.routers import api_keys as api_keys_router
+from app.routers import invitations as invitations_router
 from app.auth import get_secret_key
 from app.security import (
     SecurityHeadersMiddleware,
@@ -29,6 +32,7 @@ async def lifespan(app: FastAPI):
     print(f"Rate Limiting: {'ENABLED' if RATE_LIMIT_ENABLED else 'DISABLED'}")
     print(f"Session Timeout: {os.getenv('ACCESS_TOKEN_EXPIRE_MINUTES', '30')} minutes")
     print(f"CORS Origins: {os.getenv('CORS_ORIGINS', 'http://localhost:8080,http://127.0.0.1:8080')}")
+    print(f"Invite-Only Registration: {'ENABLED' if os.getenv('INVITE_ONLY', 'false').lower() == 'true' else 'DISABLED'}")
     print("=" * 70)
     yield
     # Shutdown: cleanup if needed
@@ -64,7 +68,7 @@ app.add_middleware(
     allow_origins=cors_origins,  # Whitelist only - CRITICAL CHANGE
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # Explicit methods
-    allow_headers=["Authorization", "Content-Type", "X-Requested-With"],  # Explicit headers
+    allow_headers=["Authorization", "Content-Type", "X-Requested-With", "X-API-Key"],  # Explicit headers
     max_age=600,  # Cache preflight requests for 10 minutes
 )
 
@@ -81,6 +85,9 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(admin.router)
 app.include_router(oauth_router.router)
+app.include_router(roles_router.router)
+app.include_router(api_keys_router.router)
+app.include_router(invitations_router.router)
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")

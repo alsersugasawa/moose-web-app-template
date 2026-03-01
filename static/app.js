@@ -3,6 +3,7 @@ let authToken = localStorage.getItem('authToken');
 let currentUser = null;
 let pendingTotpToken = null;   // short-lived token held during 2FA login step (never in localStorage)
 let pendingResetToken = null;  // password-reset token from ?reset_token= URL param
+let inviteOnlyMode = false;    // set by loadAppConfig()
 
 const API_BASE = '/api';
 
@@ -44,6 +45,10 @@ async function loadAppConfig() {
             const headerEl = document.getElementById('header-app-title');
             if (titleEl) titleEl.textContent = name;
             if (headerEl) headerEl.textContent = name;
+            // Invite-only mode
+            inviteOnlyMode = !!data.invite_only;
+            const inviteRow = document.getElementById('invite-token-row');
+            if (inviteRow) inviteRow.style.display = inviteOnlyMode ? '' : 'none';
         }
     } catch (_) {}
 }
@@ -77,7 +82,14 @@ function showApp() {
     if (usernameEl) usernameEl.textContent = currentUser.username;
 
     const adminLink = document.getElementById('admin-link');
-    if (adminLink && currentUser.is_admin) adminLink.style.display = 'inline-block';
+    const hasAdminAccess = currentUser.is_admin ||
+        (currentUser.permissions_effective && currentUser.permissions_effective.length > 0);
+    if (adminLink && hasAdminAccess) adminLink.style.display = 'inline-block';
+
+    // Show display_name in header if set
+    if (usernameEl && currentUser.display_name) {
+        usernameEl.textContent = currentUser.display_name;
+    }
 
     // Show email verification banner when email is not yet verified
     const banner = document.getElementById('email-verify-banner');
@@ -125,6 +137,18 @@ function _hideAllAuthForms() {
 
 function checkUrlParams() {
     const params = new URLSearchParams(window.location.search);
+
+    // Invitation link: ?invite=<token>
+    const inviteToken = params.get('invite');
+    if (inviteToken) {
+        history.replaceState(null, '', window.location.pathname);
+        const inviteField = document.getElementById('register-invite-token');
+        if (inviteField) inviteField.value = inviteToken;
+        const inviteRow = document.getElementById('invite-token-row');
+        if (inviteRow) inviteRow.style.display = '';  // always show when token is present
+        showRegister();
+        return;
+    }
 
     const verifyToken = params.get('verify_token');
     if (verifyToken) {
@@ -244,10 +268,11 @@ async function handleRegister(event) {
     errorEl.textContent = '';
 
     try {
+        const inviteToken = document.getElementById('register-invite-token')?.value?.trim() || null;
         const res = await fetch(`${API_BASE}/auth/register`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, email, password })
+            body: JSON.stringify({ username, email, password, invite_token: inviteToken })
         });
         if (!res.ok) {
             const data = await res.json();
@@ -579,6 +604,9 @@ function renderDashboard() {
     document.querySelectorAll('[data-custom-card]').forEach(el => el.remove());
     const row = document.getElementById('dashboard-cards-row');
     if (row) prefs.customCards.forEach(card => row.insertAdjacentHTML('beforeend', _buildCustomCardCol(card)));
+
+    // Load API keys into the card
+    loadApiKeys();
 }
 
 function _buildCustomCardCol(card) {
@@ -608,7 +636,7 @@ function _buildCustomCardCol(card) {
 function openCustomizePanel() {
     const prefs = _getDashboardPrefs();
     // Sync toggle checkboxes
-    ['welcome', 'account-security'].forEach(id => {
+    ['welcome', 'account-security', 'api-keys'].forEach(id => {
         const el = document.getElementById('toggle-' + id);
         if (el) el.checked = !prefs.hidden.includes(id);
     });
@@ -725,4 +753,192 @@ function _escHtml(str) {
 function _fmtDate(iso) {
     if (!iso) return '—';
     return new Date(iso).toLocaleString();
+}
+
+// ─── Profile ──────────────────────────────────────────────────────────────────
+
+async function openProfile() {
+    try {
+        const res = await fetch(`${API_BASE}/auth/profile`, {
+            headers: { Authorization: `Bearer ${authToken}` }
+        });
+        if (!res.ok) return;
+        const p = await res.json();
+        document.getElementById('profile-display-name').value = p.display_name || '';
+        document.getElementById('profile-bio').value = p.bio || '';
+        const tzEl = document.getElementById('profile-timezone');
+        if (tzEl) tzEl.value = p.timezone || 'UTC';
+        const langEl = document.getElementById('profile-language');
+        if (langEl) langEl.value = p.language || 'en';
+
+        const avatarImg = document.getElementById('profile-avatar-img');
+        const avatarPlaceholder = document.getElementById('profile-avatar-placeholder');
+        if (p.avatar_path) {
+            avatarImg.src = p.avatar_path + '?t=' + Date.now();
+            avatarImg.classList.remove('d-none');
+            avatarPlaceholder.classList.add('d-none');
+        } else {
+            avatarImg.classList.add('d-none');
+            avatarPlaceholder.classList.remove('d-none');
+        }
+
+        const el = document.getElementById('profileOffcanvas');
+        if (el) (bootstrap.Offcanvas.getInstance(el) || new bootstrap.Offcanvas(el)).show();
+    } catch (_) {}
+}
+
+async function handleProfileUpdate(event) {
+    event.preventDefault();
+    const msgEl = document.getElementById('profile-msg');
+    msgEl.textContent = '';
+    const body = {
+        display_name: document.getElementById('profile-display-name').value.trim() || null,
+        bio: document.getElementById('profile-bio').value.trim() || null,
+        timezone: document.getElementById('profile-timezone').value,
+        language: document.getElementById('profile-language').value,
+    };
+    try {
+        const res = await fetch(`${API_BASE}/auth/profile`, {
+            method: 'PUT',
+            headers: { Authorization: `Bearer ${authToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (res.ok) {
+            msgEl.className = 'text-success small mb-2';
+            msgEl.textContent = 'Profile saved.';
+            // Update header display name
+            const usernameEl = document.getElementById('username-display');
+            if (usernameEl) {
+                usernameEl.textContent = data.display_name || currentUser.username;
+            }
+        } else {
+            msgEl.className = 'text-danger small mb-2';
+            msgEl.textContent = data.detail || 'Save failed.';
+        }
+    } catch (_) {
+        msgEl.className = 'text-danger small mb-2';
+        msgEl.textContent = 'Network error.';
+    }
+}
+
+async function handleAvatarUpload(input) {
+    if (!input.files || !input.files[0]) return;
+    const formData = new FormData();
+    formData.append('file', input.files[0]);
+    try {
+        const res = await fetch(`${API_BASE}/auth/profile/avatar`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${authToken}` },
+            body: formData
+        });
+        const data = await res.json();
+        if (res.ok) {
+            const avatarImg = document.getElementById('profile-avatar-img');
+            avatarImg.src = data.avatar_path + '?t=' + Date.now();
+            avatarImg.classList.remove('d-none');
+            document.getElementById('profile-avatar-placeholder').classList.add('d-none');
+        } else {
+            alert(data.detail || 'Avatar upload failed.');
+        }
+    } catch (_) {
+        alert('Network error during upload.');
+    }
+    // Reset the file input so the same file can be re-selected
+    input.value = '';
+}
+
+// ─── API Keys ─────────────────────────────────────────────────────────────────
+
+async function loadApiKeys() {
+    const listEl = document.getElementById('api-keys-list');
+    if (!listEl || !authToken) return;
+    try {
+        const res = await fetch(`${API_BASE}/auth/api-keys`, {
+            headers: { Authorization: `Bearer ${authToken}` }
+        });
+        if (!res.ok) { listEl.innerHTML = '<div class="list-group-item text-danger small">Failed to load.</div>'; return; }
+        const keys = await res.json();
+        if (keys.length === 0) {
+            listEl.innerHTML = '<div class="list-group-item text-muted small py-2">No API keys yet.</div>';
+            return;
+        }
+        listEl.innerHTML = keys.map(k => `
+            <div class="list-group-item d-flex justify-content-between align-items-center py-2">
+                <div>
+                    <div class="fw-semibold">${_escHtml(k.name)}${k.is_active ? '' : ' <span class="badge bg-secondary">Inactive</span>'}</div>
+                    <div class="text-muted font-monospace" style="font-size:0.75rem;">${_escHtml(k.key_prefix)}…</div>
+                    <div class="text-muted" style="font-size:0.75rem;">${k.last_used ? 'Used ' + _fmtDate(k.last_used) : 'Never used'}${k.expires_at ? ' · Exp: ' + _fmtDate(k.expires_at) : ''}</div>
+                </div>
+                <button class="btn btn-sm btn-outline-danger ms-2 flex-shrink-0" onclick="revokeApiKey('${_escHtml(k.id)}')">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>`).join('');
+    } catch (_) {
+        listEl.innerHTML = '<div class="list-group-item text-danger small">Network error.</div>';
+    }
+}
+
+function showCreateApiKeyModal() {
+    document.getElementById('api-key-name').value = '';
+    document.getElementById('api-key-expires').value = '';
+    document.getElementById('api-key-create-error').textContent = '';
+    document.getElementById('api-key-create-form').style.display = '';
+    document.getElementById('api-key-created-result').style.display = 'none';
+    document.getElementById('api-key-modal-footer').innerHTML =
+        '<button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>' +
+        '<button type="button" class="btn btn-primary btn-sm" onclick="handleCreateApiKey()">Create Key</button>';
+    const el = document.getElementById('apiKeyModal');
+    if (el) (bootstrap.Modal.getInstance(el) || new bootstrap.Modal(el)).show();
+}
+
+async function handleCreateApiKey() {
+    const name = document.getElementById('api-key-name').value.trim();
+    const errEl = document.getElementById('api-key-create-error');
+    errEl.textContent = '';
+    if (!name) { errEl.textContent = 'Key name is required.'; return; }
+    const expiresIn = document.getElementById('api-key-expires').value;
+    const body = { name, scopes: [], expires_in_days: expiresIn ? parseInt(expiresIn) : null };
+    try {
+        const res = await fetch(`${API_BASE}/auth/api-keys`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${authToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (!res.ok) { errEl.textContent = data.detail || 'Failed to create key.'; return; }
+
+        document.getElementById('api-key-value').value = data.key;
+        document.getElementById('api-key-create-form').style.display = 'none';
+        document.getElementById('api-key-created-result').style.display = '';
+        document.getElementById('api-key-modal-footer').innerHTML =
+            '<button type="button" class="btn btn-primary btn-sm" data-bs-dismiss="modal" onclick="loadApiKeys()">Done</button>';
+    } catch (_) {
+        errEl.textContent = 'Network error.';
+    }
+}
+
+async function revokeApiKey(keyId) {
+    if (!confirm('Revoke this API key? It will stop working immediately.')) return;
+    try {
+        const res = await fetch(`${API_BASE}/auth/api-keys/${keyId}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${authToken}` }
+        });
+        if (res.ok) await loadApiKeys();
+        else alert('Failed to revoke key.');
+    } catch (_) {
+        alert('Network error.');
+    }
+}
+
+function copyApiKey() {
+    const val = document.getElementById('api-key-value').value;
+    const btn = document.getElementById('api-key-copy-btn');
+    navigator.clipboard.writeText(val).then(() => {
+        if (btn) { btn.innerHTML = '<i class="bi bi-check-lg"></i>'; setTimeout(() => { btn.innerHTML = '<i class="bi bi-clipboard"></i>'; }, 2000); }
+    }).catch(() => {
+        // Fallback: select the text
+        document.getElementById('api-key-value').select();
+    });
 }

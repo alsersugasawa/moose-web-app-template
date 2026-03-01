@@ -18,8 +18,10 @@ function checkAuth() {
 
     adminUser = JSON.parse(userStr);
 
-    if (!adminUser.is_admin) {
-        alert('Access denied. Admin privileges required.');
+    const hasAccess = adminUser.is_admin ||
+        (adminUser.permissions_effective && adminUser.permissions_effective.length > 0);
+    if (!hasAccess) {
+        alert('Access denied. Admin or elevated permissions required.');
         logout();
         return;
     }
@@ -72,6 +74,9 @@ function showSection(sectionName) {
             break;
         case 'certificates':
             loadCertStatus();
+            break;
+        case 'invitations':
+            loadInvitations();
             break;
         case 'myaccount':
             loadMyAccount();
@@ -183,7 +188,9 @@ async function loadUsers() {
             <tr>
                 <td>${user.id}</td>
                 <td>${user.username}</td>
+                <td>${user.display_name ? _adminEscHtml(user.display_name) : '<span class="text-muted">—</span>'}</td>
                 <td>${user.email}</td>
+                <td>${user.role ? `<span class="badge badge-info">${_adminEscHtml(user.role.name)}</span>` : '<span class="text-muted">—</span>'}</td>
                 <td><span class="badge ${user.is_admin ? 'badge-success' : 'badge-info'}">${user.is_admin ? 'Yes' : 'No'}</span></td>
                 <td><span class="badge ${user.is_active ? 'badge-success' : 'badge-danger'}">${user.is_active ? 'Active' : 'Inactive'}</span></td>
                 <td>${user.last_login ? formatDateTime(user.last_login) : 'Never'}</td>
@@ -245,20 +252,37 @@ async function handleCreateUser(event) {
 
 async function editUser(userId) {
     try {
-        const response = await fetch(`${API_BASE}/api/admin/users`, {
-            headers: {
-                'Authorization': `Bearer ${adminToken}`
-            }
-        });
+        const [usersResp, rolesResp] = await Promise.all([
+            fetch(`${API_BASE}/api/admin/users`, {
+                headers: { 'Authorization': `Bearer ${adminToken}` }
+            }),
+            fetch(`${API_BASE}/api/admin/roles`, {
+                headers: { 'Authorization': `Bearer ${adminToken}` }
+            })
+        ]);
 
-        if (!response.ok) throw new Error('Failed to load users');
+        if (!usersResp.ok) throw new Error('Failed to load users');
 
-        const users = await response.json();
+        const users = await usersResp.json();
         const user = users.find(u => u.id === userId);
 
         if (!user) {
             alert('User not found');
             return;
+        }
+
+        // Populate role dropdown
+        const roleSelect = document.getElementById('edit-user-role');
+        roleSelect.innerHTML = '<option value="0">— No Role —</option>';
+        if (rolesResp.ok) {
+            const roles = await rolesResp.json();
+            roles.forEach(role => {
+                const opt = document.createElement('option');
+                opt.value = role.id;
+                opt.textContent = role.name;
+                if (user.role && user.role.id === role.id) opt.selected = true;
+                roleSelect.appendChild(opt);
+            });
         }
 
         document.getElementById('edit-user-id').value = user.id;
@@ -281,10 +305,12 @@ async function handleEditUser(event) {
     event.preventDefault();
 
     const userId = document.getElementById('edit-user-id').value;
+    const roleVal = parseInt(document.getElementById('edit-user-role').value, 10);
     const userData = {
         email: document.getElementById('edit-email').value,
         is_admin: document.getElementById('edit-is-admin').checked,
-        is_active: document.getElementById('edit-is-active').checked
+        is_active: document.getElementById('edit-is-active').checked,
+        role_id: roleVal  // 0 = clear role, positive = assign role
     };
 
     try {
@@ -1600,5 +1626,156 @@ async function handleUpdatePassword(event) {
         _showFieldMsg('password-update-error', 'password-update-success', true, 'Network error. Please try again.');
     } finally {
         btn.disabled = false; btn.textContent = 'Save Password';
+    }
+}
+
+// ─── Roles Helper ─────────────────────────────────────────────────────────────
+
+async function loadRoles() {
+    try {
+        const response = await fetch(`${API_BASE}/api/admin/roles`, {
+            headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        if (!response.ok) return [];
+        return await response.json();
+    } catch (error) {
+        console.error('Error loading roles:', error);
+        return [];
+    }
+}
+
+// ─── Invitation Management ────────────────────────────────────────────────────
+
+async function loadInvitations() {
+    try {
+        const response = await fetch(`${API_BASE}/api/admin/invitations`, {
+            headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        if (!response.ok) throw new Error('Failed to load invitations');
+
+        const invitations = await response.json();
+        const tbody = document.getElementById('invitations-table-body');
+
+        if (invitations.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted" style="padding:20px;">No invitations yet</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = invitations.map(inv => {
+            const isUsed = !!inv.used_by;
+            const isExpired = !isUsed && new Date(inv.expires_at) < new Date();
+            let statusBadge;
+            if (isUsed) statusBadge = '<span class="badge badge-success">Used</span>';
+            else if (isExpired) statusBadge = '<span class="badge badge-danger">Expired</span>';
+            else statusBadge = '<span class="badge badge-info">Active</span>';
+
+            return `
+                <tr>
+                    <td>${inv.email ? _adminEscHtml(inv.email) : '<span class="text-muted">—</span>'}</td>
+                    <td>${statusBadge}</td>
+                    <td>${formatDateTime(inv.expires_at)}</td>
+                    <td>${formatDateTime(inv.created_at)}</td>
+                    <td>${inv.used_at ? formatDateTime(inv.used_at) : '—'}</td>
+                    <td>
+                        ${!isUsed && !isExpired ? `<button class="btn-sm btn-edit" onclick="copyInvitationLink('${_adminEscHtml(inv.token)}')">Copy Link</button>` : ''}
+                        ${!isUsed ? `<button class="btn-sm btn-delete" onclick="revokeInvitation('${inv.id}')">Revoke</button>` : ''}
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+    } catch (error) {
+        console.error('Error loading invitations:', error);
+        alert('Failed to load invitations');
+    }
+}
+
+function showCreateInvitationModal() {
+    document.getElementById('create-invitation-modal').classList.add('show');
+    document.getElementById('create-invitation-form').reset();
+    document.getElementById('invitation-link-result').style.display = 'none';
+    document.getElementById('invitation-link-value').value = '';
+}
+
+function closeCreateInvitationModal() {
+    document.getElementById('create-invitation-modal').classList.remove('show');
+}
+
+async function handleCreateInvitation(event) {
+    event.preventDefault();
+
+    const email = document.getElementById('invitation-email').value.trim();
+    const expiresHours = parseInt(document.getElementById('invitation-expires').value, 10) || 72;
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + expiresHours);
+
+    const body = { expires_at: expiresAt.toISOString() };
+    if (email) body.email = email;
+
+    try {
+        const response = await fetch(`${API_BASE}/api/admin/invitations`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${adminToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(body)
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to create invitation');
+        }
+
+        const inv = await response.json();
+        const link = `${window.location.origin}/static/index.html?invite=${inv.token}`;
+        document.getElementById('invitation-link-value').value = link;
+        document.getElementById('invitation-link-result').style.display = '';
+        loadInvitations();
+
+    } catch (error) {
+        alert(error.message);
+    }
+}
+
+async function revokeInvitation(invId) {
+    if (!confirm('Revoke this invitation? The link will no longer work.')) return;
+
+    try {
+        const response = await fetch(`${API_BASE}/api/admin/invitations/${invId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to revoke invitation');
+        }
+
+        loadInvitations();
+
+    } catch (error) {
+        alert(error.message);
+    }
+}
+
+function copyInvitationLink(token) {
+    const link = `${window.location.origin}/static/index.html?invite=${token}`;
+    navigator.clipboard.writeText(link).then(() => {
+        alert('Invitation link copied to clipboard!');
+    }).catch(() => {
+        prompt('Copy this invitation link:', link);
+    });
+}
+
+function copyInvitationLinkFromInput() {
+    const input = document.getElementById('invitation-link-value');
+    if (input && input.value) {
+        navigator.clipboard.writeText(input.value).then(() => {
+            alert('Link copied to clipboard!');
+        }).catch(() => {
+            input.select();
+            document.execCommand('copy');
+        });
     }
 }

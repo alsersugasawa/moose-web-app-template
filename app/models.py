@@ -1,9 +1,22 @@
 import uuid as uuid_module
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Text, JSON, Boolean, UniqueConstraint
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.database import Base
+
+
+class Role(Base):
+    __tablename__ = "roles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(50), unique=True, nullable=False, index=True)
+    permissions = Column(JSONB, nullable=False, default=list)
+    description = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    users = relationship("User", back_populates="role")
 
 
 class User(Base):
@@ -33,6 +46,17 @@ class User(Base):
     # Phase 1: TOTP
     totp_secret = Column(String(64), nullable=True)
     totp_enabled = Column(Boolean, default=False, nullable=False)
+
+    # Phase 2: RBAC
+    role_id = Column(Integer, ForeignKey("roles.id", ondelete="SET NULL"), nullable=True, index=True)
+    role = relationship("Role", back_populates="users")
+
+    # Phase 2: Profile
+    display_name = Column(String(100), nullable=True)
+    bio = Column(Text, nullable=True)
+    avatar_path = Column(String(255), nullable=True)
+    timezone = Column(String(50), nullable=True, default="UTC")
+    language = Column(String(10), nullable=True, default="en")
 
     __table_args__ = (
         UniqueConstraint("oauth_provider", "oauth_user_id", name="uq_oauth_provider_user"),
@@ -101,3 +125,36 @@ class UserSession(Base):
     is_revoked = Column(Boolean, default=False, nullable=False)
 
     user = relationship("User", backref="sessions")
+
+
+class ApiKey(Base):
+    __tablename__ = "api_keys"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid_module.uuid4)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(100), nullable=False)
+    key_hash = Column(String(255), nullable=False)
+    key_prefix = Column(String(10), nullable=False, index=True)
+    scopes = Column(JSONB, nullable=False, default=list)
+    last_used = Column(DateTime, nullable=True)
+    expires_at = Column(DateTime, nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    user = relationship("User", backref="api_keys")
+
+
+class Invitation(Base):
+    __tablename__ = "invitations"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid_module.uuid4)
+    token = Column(String(64), unique=True, nullable=False, index=True)
+    email = Column(String(100), nullable=True)
+    created_by = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    used_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    used_at = Column(DateTime, nullable=True)
+
+    creator = relationship("User", foreign_keys=[created_by], backref="created_invitations")
+    consumer = relationship("User", foreign_keys=[used_by])

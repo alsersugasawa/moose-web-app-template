@@ -195,3 +195,132 @@ class CertStatus(BaseModel):
 class CertUploadResponse(BaseModel):
     message: str
     cert_info: CertStatus
+
+
+# ─── Phase 2: RBAC ────────────────────────────────────────────────────────────
+
+class RoleCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    permissions: List[str] = []
+
+
+class RoleUpdate(BaseModel):
+    description: Optional[str] = None
+    permissions: Optional[List[str]] = None
+
+
+class RoleResponse(BaseModel):
+    id: int
+    name: str
+    description: Optional[str] = None
+    permissions: List[str] = []
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ─── Phase 2: Profile ─────────────────────────────────────────────────────────
+
+class ProfileUpdate(BaseModel):
+    display_name: Optional[str] = None
+    bio: Optional[str] = None
+    timezone: Optional[str] = None
+    language: Optional[str] = None
+
+
+class ProfileResponse(BaseModel):
+    id: int
+    username: str
+    display_name: Optional[str] = None
+    bio: Optional[str] = None
+    avatar_path: Optional[str] = None
+    timezone: Optional[str] = None
+    language: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+# ─── Phase 2: API Keys ────────────────────────────────────────────────────────
+
+class ApiKeyCreate(BaseModel):
+    name: str
+    scopes: List[str] = []
+    expires_in_days: Optional[int] = None  # None = never expires
+
+
+class ApiKeyPatch(BaseModel):
+    name: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+class ApiKeyCreateResponse(BaseModel):
+    id: str
+    name: str
+    key: str          # full raw key — shown ONCE
+    key_prefix: str
+    scopes: List[str]
+    expires_at: Optional[datetime] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ApiKeyResponse(BaseModel):
+    id: str
+    name: str
+    key_prefix: str
+    scopes: List[str]
+    last_used: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
+    is_active: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ─── Phase 2: Invitations ─────────────────────────────────────────────────────
+
+class InvitationCreate(BaseModel):
+    email: Optional[EmailStr] = None
+    expires_in_hours: int = 72
+
+
+class InvitationResponse(BaseModel):
+    id: str
+    token: str
+    email: Optional[str] = None
+    expires_at: datetime
+    used_at: Optional[datetime] = None
+    used_by: Optional[int] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ─── Phase 2: Extended user/admin schemas ─────────────────────────────────────
+
+class UserResponseV2(UserResponse):
+    role: Optional[str] = None               # role name
+    display_name: Optional[str] = None
+    avatar_path: Optional[str] = None
+    permissions_effective: Optional[List[str]] = None
+
+
+class AdminUserResponseV2(AdminUserResponse):
+    role_id: Optional[int] = None
+    role: Optional[RoleResponse] = None
+    display_name: Optional[str] = None
+
+
+class AdminUserUpdateV2(AdminUserUpdate):
+    role_id: Optional[int] = None  # 0 = clear role; positive int = assign role
+
+
+class UserCreateV2(UserCreate):
+    invite_token: Optional[str] = None
