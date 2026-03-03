@@ -1,6 +1,6 @@
-# Web Platform Template v1.1.0
+# Web Platform Template v1.2.0
 
-A full-stack web application template with authentication, admin portal, and production-ready infrastructure.
+A full-stack web application template with authentication, role-based access control, admin portal, and production-ready infrastructure.
 
 ## Features
 
@@ -12,8 +12,15 @@ A full-stack web application template with authentication, admin portal, and pro
 - **Two-Factor Authentication (TOTP)** — Time-based one-time passwords (Google Authenticator, Authy, etc.)
 - **Active Session Management** — View and revoke active JWT sessions from the user profile
 
+### User Management & Access Control
+- **Role-Based Access Control (RBAC)** — Named roles (`viewer`, `editor`, `manager`) with JSON permission arrays; assign roles to users from the admin portal
+- **Permission Scopes** — Fine-grained action scopes (e.g. `users:read`, `logs:read`) enforced at the router level via `require_permission(scope)`
+- **User Profiles** — Avatar upload (200×200 JPEG), display name, bio, timezone, and language preferences
+- **API Keys** — Users generate long-lived `mpk_`-prefixed keys for programmatic/service access; stored as bcrypt hashes
+- **Invite-Only Registration** — Admins issue single-use invitation tokens; set `INVITE_ONLY=true` to require a token for all new sign-ups
+
 ### Platform
-- **Admin Portal** — User management, system monitoring, and database backups
+- **Admin Portal** — User management, role assignment, invitation management, system monitoring, and database backups
 - **Initial Setup Wizard** — Auto-launched on first visit to create the admin account and set the app name
 - **Customizable Dashboard** — Show/hide built-in cards and add custom cards with icons and links
 - **Administrator Account Editing** — Change username, email, and password from the admin portal
@@ -33,6 +40,7 @@ A full-stack web application template with authentication, admin portal, and pro
 - **Backend**: FastAPI, SQLAlchemy 2.0 (async), PostgreSQL 14, uvicorn
 - **Frontend**: HTML, CSS, JavaScript, Bootstrap 5.3
 - **Authentication**: JWT (python-jose), bcrypt (passlib), TOTP (pyotp), OAuth 2.0 (authlib)
+- **Image Processing**: Pillow (avatar resize)
 - **Email**: aiosmtplib (async SMTP)
 - **Reverse Proxy / TLS**: Caddy 2 (production)
 - **Monitoring**: psutil for system resource tracking
@@ -155,6 +163,7 @@ Or use the Minikube helper script:
    psql webapp < migrations/001_add_admin_features.sql
    psql webapp < migrations/002_add_app_config.sql
    psql webapp < migrations/003_phase1.sql
+   psql webapp < migrations/004_phase2.sql
    ```
 
 4. **Start the server**
@@ -175,6 +184,7 @@ Or use the Minikube helper script:
 | `REQUIRE_JTI` | `false` | Enforce session tracking for all JWTs (strict mode) |
 | `FORCE_EMAIL_VERIFICATION` | `false` | Block all unverified users globally |
 | `APP_BASE_URL` | `http://localhost:8080` | Base URL used in email links |
+| `INVITE_ONLY` | `false` | When `true`, registration requires a valid invitation token |
 
 ### Email (optional — logs to stdout if unset)
 
@@ -209,17 +219,21 @@ Or use the Minikube helper script:
 .
 ├── app/
 │   ├── main.py              # FastAPI application entry point
-│   ├── models.py            # SQLAlchemy ORM models
+│   ├── models.py            # SQLAlchemy ORM models (User, Role, ApiKey, Invitation, …)
 │   ├── schemas.py           # Pydantic request/response schemas
-│   ├── auth.py              # JWT authentication and session logic
+│   ├── auth.py              # JWT + API key authentication and session logic
+│   ├── permissions.py       # require_permission(scope) dependency factory
 │   ├── database.py          # Async database connection
 │   ├── config.py            # App configuration
 │   ├── email.py             # Async SMTP helpers (verification, password reset)
 │   ├── security.py          # Rate limiting and security header middleware
 │   └── routers/
-│       ├── auth.py          # Auth endpoints (register, login, TOTP, sessions, …)
+│       ├── auth.py          # Auth endpoints (register, login, profile, TOTP, sessions, …)
 │       ├── admin.py         # Admin portal endpoints
-│       └── oauth.py         # OAuth 2.0 redirect + callback (Google, GitHub)
+│       ├── oauth.py         # OAuth 2.0 redirect + callback (Google, GitHub)
+│       ├── roles.py         # Role CRUD (/api/admin/roles)
+│       ├── api_keys.py      # API key CRUD (/api/auth/api-keys)
+│       └── invitations.py   # Invitation management (/api/admin/invitations)
 ├── static/
 │   ├── index.html           # Main application page
 │   ├── app.js               # Frontend application logic
@@ -231,9 +245,16 @@ Or use the Minikube helper script:
 ├── migrations/
 │   ├── 001_add_admin_features.sql
 │   ├── 002_add_app_config.sql
-│   └── 003_phase1.sql       # Email verification, OAuth, TOTP, sessions
+│   ├── 003_phase1.sql       # Email verification, OAuth, TOTP, sessions
+│   └── 004_phase2.sql       # Roles, API keys, invitations, user profile columns
 ├── docs/
-│   └── ROADMAP.md           # Feature roadmap
+│   ├── ROADMAP.md           # Feature roadmap
+│   ├── guides/
+│   │   └── USER_GUIDE.md    # End-user documentation
+│   ├── security/
+│   │   └── SECURITY_COMPLIANCE.md
+│   └── development/
+│       └── RELEASE_PROCESS.md
 ├── k8s/                     # Kubernetes manifests
 ├── scripts/                 # Deployment scripts
 ├── Caddyfile                # Caddy reverse proxy + TLS configuration
@@ -248,11 +269,16 @@ Or use the Minikube helper script:
 2. **Add API routes** under `app/routers/`
 3. **Update the frontend** in `static/index.html` and `static/app.js`
 4. **Add database migrations** in `migrations/`
-5. **Customize the dashboard** — use the built-in Customize panel to add cards without touching code
+5. **Define permission scopes** in `app/permissions.py` and protect endpoints with `require_permission("scope:action")`
+6. **Customize the dashboard** — use the built-in Customize panel to add cards without touching code
 
 ## Documentation
 
+- **[Changelog](CHANGELOG.md)** — Version history
 - **[Roadmap](docs/ROADMAP.md)** — Planned features and enhancements
+- **[System Requirements](docs/SYSTEM_REQUIREMENTS.md)** — Functional and non-functional requirements, data model, API surface, security controls
+- **[User Guide](docs/guides/USER_GUIDE.md)** — End-user documentation
+- **[Security Compliance](docs/security/SECURITY_COMPLIANCE.md)** — ISO 27001 / NIST / OWASP ASVS mapping
 - **[Kubernetes Deployment](k8s/README.md)** — Production Kubernetes guide
 - **[Scripts](scripts/README.md)** — Deployment script documentation
 

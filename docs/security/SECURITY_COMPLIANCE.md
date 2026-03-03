@@ -123,7 +123,7 @@ ENVIRONMENT=production  # Set to 'production' to disable API docs
 | Control | Description | Implementation |
 |---------|-------------|----------------|
 | A.9.2.1 | User registration and de-registration | Admin user management with audit logging |
-| A.9.2.2 | User access provisioning | Role-based access control (admin/user) |
+| A.9.2.2 | User access provisioning | RBAC with named roles (`viewer`, `editor`, `manager`), per-role JSON permission scopes, and admin flag |
 | A.9.3.1 | Use of secret authentication information | Bcrypt password hashing, secure SECRET_KEY |
 | A.9.4.2 | Secure log-on procedures | Rate limiting, session timeout |
 | A.9.4.3 | Password management system | Password complexity validation |
@@ -326,7 +326,9 @@ For security questions or to report vulnerabilities:
 
 ## Version History
 
-- v3.0.0 - Initial security compliance implementation
+- v1.2.0 - Added RBAC (roles, scopes), API key auth, invite-only registration
+- v1.1.0 - Added TOTP 2FA, email verification, OAuth, session management, HTTPS/Caddy
+- v1.0.0 - Initial security compliance implementation
 - Compliance levels achieved:
   - ISO 27001: Substantial compliance with key controls
   - NIST SP 800-53: Moderate baseline controls implemented
@@ -334,5 +336,5 @@ For security questions or to report vulnerabilities:
 
 ---
 
-*Document Last Updated: 2026-01-21*
-*Next Review Date: 2026-04-21*
+*Document Last Updated: 2026-02-24*
+*Next Review Date: 2026-05-24*

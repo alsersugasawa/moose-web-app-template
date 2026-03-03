@@ -17,15 +17,15 @@ Strengthen the existing auth system with standard account-security features.
 
 ---
 
-## Phase 2 — User Management & Access Control
+## Phase 2 — User Management & Access Control ✅
 
 Move beyond the binary `is_admin` flag to a proper permission model.
 
-- [ ] **Role-Based Access Control (RBAC)** — Define named roles (e.g. `viewer`, `editor`, `manager`) and assign them to users
-- [ ] **Permission scopes** — Attach fine-grained action permissions to each role, enforced at the router level
-- [ ] **User profile pages** — Avatar upload, display name, bio, and per-user preferences (theme, timezone, language)
-- [ ] **API key management** — Allow users to generate long-lived API keys for programmatic/service access
-- [ ] **Invite-only registration** — Admin-issued invitation tokens that gate new user sign-ups
+- [x] **Role-Based Access Control (RBAC)** — Define named roles (e.g. `viewer`, `editor`, `manager`) and assign them to users
+- [x] **Permission scopes** — Attach fine-grained action permissions to each role, enforced at the router level
+- [x] **User profile pages** — Avatar upload, display name, bio, and per-user preferences (theme, timezone, language)
+- [x] **API key management** — Allow users to generate long-lived API keys for programmatic/service access
+- [x] **Invite-only registration** — Admin-issued invitation tokens that gate new user sign-ups
 
 ---
 
@@ -117,3 +117,8 @@ Modernize and expand the frontend options.
 | Active session management (view & revoke JWT sessions) | v1.1.0 |
 | Customizable user dashboard (show/hide cards, custom cards) | v1.1.0 |
 | Administrator account self-editing (username, email, password) | v1.1.0 |
+| Role-Based Access Control — named roles with permission scopes | v1.2.0 |
+| User profile pages — avatar, display name, bio, timezone, language | v1.2.0 |
+| API key management — `mpk_` prefixed keys, bcrypt-hashed | v1.2.0 |
+| Invite-only registration — admin-issued single-use tokens | v1.2.0 |
+| Admin portal — Invitations section + role assignment in user editor | v1.2.0 |
