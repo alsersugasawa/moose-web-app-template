@@ -2,6 +2,33 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.1] - 2026-03-02
+
+### Changed — dependency upgrades
+- **Python base image**: 3.11-slim → 3.13-slim
+- **PostgreSQL**: 14-alpine → 18-alpine  ⚠️ *Existing deployments must dump and restore data before upgrading — PostgreSQL does not auto-upgrade volumes across major versions*
+- **FastAPI**: 0.115.0 → 0.135.1
+- **uvicorn**: 0.32.0 → 0.41.0
+- **pydantic** / **pydantic-settings** / **pydantic[email]**: 2.9.0 / 2.1.0 → 2.12.5 / 2.13.1
+- **email-validator**: 2.1.0 → 2.3.0
+- **SQLAlchemy**: 2.0.23 → 2.0.48
+- **asyncpg**: 0.29.0 → 0.31.0
+- **python-jose**: 3.3.0 → 3.5.0
+- **bcrypt**: 4.1.2 → 5.0.0
+- **python-multipart**: 0.0.6 → 0.0.22
+- **alembic**: 1.13.1 → 1.18.4
+- **psutil**: 5.9.8 → 7.2.2
+- **requests**: 2.31.0 → 2.32.5
+- **aiosmtplib**: 3.0.1 → 5.1.0
+- **authlib**: 1.3.1 → 1.6.9
+- **httpx**: 0.27.0 → 0.28.1
+- **qrcode**: 7.4.2 → 8.2
+- **Pillow**: 10.3.0 → 12.1.1
+- **Bootstrap**: 5.3.0 → 5.3.8 (CDN in all HTML pages)
+- **Bootstrap Icons**: 1.11.0 → 1.13.1 (CDN in all HTML pages)
+
+---
+
 ## [1.2.0] - 2026-02-24
 
 ### Added

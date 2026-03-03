@@ -626,7 +626,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 
 | Service | Image | Port | Role |
 |---|---|---|---|
-| `webapp-db` | `postgres:14-alpine` | 5432 (internal) | Database |
+| `webapp-db` | `postgres:18-alpine` | 5432 (internal) | Database |
 | `webapp-web` | Built from `Dockerfile` | 8080 → 8000 | Application |
 
 ### 9.2 Docker Compose (Production)
@@ -637,7 +637,7 @@ docker compose --profile proxy up -d
 
 | Service | Image | Port | Role |
 |---|---|---|---|
-| `webapp-db` | `postgres:14-alpine` | 5432 (internal) | Database |
+| `webapp-db` | `postgres:18-alpine` | 5432 (internal) | Database |
 | `webapp-web` | Built from `Dockerfile` | 8000 (internal) | Application |
 | `webapp-caddy` | `caddy:2-alpine` | 80, 443 | TLS reverse proxy |
 
@@ -645,7 +645,7 @@ docker compose --profile proxy up -d
 
 | Requirement | Detail |
 |---|---|
-| Base image | `python:3.11-slim` |
+| Base image | `python:3.13-slim` |
 | System packages | `gcc`, `python3-dev`, `postgresql-client`, `libpng-dev`, `libjpeg-dev`, `zlib1g-dev` |
 | Runtime user | `appuser` (UID 1000, non-root) |
 | Exposed port | 8000 |
@@ -656,7 +656,7 @@ docker compose --profile proxy up -d
 
 | Requirement | Value |
 |---|---|
-| Version | 14 (Alpine) |
+| Version | 18 (Alpine) |
 | Default database | `webapp` |
 | Default user | `postgres` |
 | Data volume | `postgres_data` (named Docker volume) |
@@ -666,24 +666,24 @@ docker compose --profile proxy up -d
 
 | Package | Version | Purpose |
 |---|---|---|
-| `fastapi` | 0.115.0 | Web framework |
-| `uvicorn[standard]` | 0.32.0 | ASGI server |
-| `pydantic` | 2.9.0 | Request/response validation |
-| `sqlalchemy` | 2.0.23 | Async ORM |
-| `asyncpg` | 0.29.0 | Async PostgreSQL driver |
-| `pydantic-settings` | 2.1.0 | Config management |
-| `python-jose[cryptography]` | 3.3.0 | JWT signing/verification |
+| `fastapi` | 0.135.1 | Web framework |
+| `uvicorn[standard]` | 0.41.0 | ASGI server |
+| `pydantic` | 2.12.5 | Request/response validation |
+| `sqlalchemy` | 2.0.48 | Async ORM |
+| `asyncpg` | 0.31.0 | Async PostgreSQL driver |
+| `pydantic-settings` | 2.13.1 | Config management |
+| `python-jose[cryptography]` | 3.5.0 | JWT signing/verification |
 | `passlib[bcrypt]` | 1.7.4 | Password hashing |
-| `bcrypt` | 4.1.2 | bcrypt backend |
-| `python-multipart` | 0.0.6 | File upload support |
-| `psutil` | 5.9.8 | System resource monitoring |
-| `aiosmtplib` | 3.0.1 | Async SMTP (email) |
-| `authlib` | 1.3.1 | OAuth 2.0 client |
-| `httpx` | 0.27.0 | Async HTTP (OAuth) |
+| `bcrypt` | 5.0.0 | bcrypt backend |
+| `python-multipart` | 0.0.22 | File upload support |
+| `psutil` | 7.2.2 | System resource monitoring |
+| `aiosmtplib` | 5.1.0 | Async SMTP (email) |
+| `authlib` | 1.6.9 | OAuth 2.0 client |
+| `httpx` | 0.28.1 | Async HTTP (OAuth) |
 | `itsdangerous` | 2.2.0 | Signed session cookies |
 | `pyotp` | 2.9.0 | TOTP generation/verification |
-| `qrcode[pil]` | 7.4.2 | TOTP QR code generation |
-| `Pillow` | 10.3.0 | Avatar image processing |
+| `qrcode[pil]` | 8.2 | TOTP QR code generation |
+| `Pillow` | 12.1.1 | Avatar image processing |
 
 ### 9.6 Kubernetes
 
