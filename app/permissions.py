@@ -23,6 +23,7 @@ SCOPES = [
     "backups:write",
     "system:read",
     "api_keys:manage",
+    "feature_flags:manage",
 ]
 
 

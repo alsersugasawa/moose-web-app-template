@@ -1,10 +1,11 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 from starlette.middleware.sessions import SessionMiddleware
 from contextlib import asynccontextmanager
+import json
 import os
 from app.database import init_db
 from app.routers import auth, admin
@@ -12,13 +13,16 @@ from app.routers import oauth as oauth_router
 from app.routers import roles as roles_router
 from app.routers import api_keys as api_keys_router
 from app.routers import invitations as invitations_router
-from app.auth import get_secret_key
+from app.routers import feature_flags as feature_flags_router
+from app.auth import get_secret_key, get_current_admin_user
 from app.security import (
     SecurityHeadersMiddleware,
     RateLimitMiddleware,
     SECURITY_HEADERS_ENABLED,
     RATE_LIMIT_ENABLED
 )
+from app.settings import settings
+from plugins import load_plugins
 
 
 @asynccontextmanager
@@ -28,11 +32,12 @@ async def lifespan(app: FastAPI):
     print("=" * 70)
     print("SECURITY CONFIGURATION STATUS")
     print("=" * 70)
-    print(f"Security Headers: {'ENABLED' if SECURITY_HEADERS_ENABLED else 'DISABLED'}")
-    print(f"Rate Limiting: {'ENABLED' if RATE_LIMIT_ENABLED else 'DISABLED'}")
-    print(f"Session Timeout: {os.getenv('ACCESS_TOKEN_EXPIRE_MINUTES', '30')} minutes")
-    print(f"CORS Origins: {os.getenv('CORS_ORIGINS', 'http://localhost:8080,http://127.0.0.1:8080')}")
-    print(f"Invite-Only Registration: {'ENABLED' if os.getenv('INVITE_ONLY', 'false').lower() == 'true' else 'DISABLED'}")
+    print(f"Environment (APP_ENV):        {settings.app_env}")
+    print(f"Security Headers:             {'ENABLED' if SECURITY_HEADERS_ENABLED else 'DISABLED'}")
+    print(f"Rate Limiting:                {'ENABLED' if RATE_LIMIT_ENABLED else 'DISABLED'}")
+    print(f"Session Timeout:              {os.getenv('ACCESS_TOKEN_EXPIRE_MINUTES', '30')} minutes")
+    print(f"CORS Origins:                 {os.getenv('CORS_ORIGINS', 'http://localhost:8080,http://127.0.0.1:8080')}")
+    print(f"Invite-Only Registration:     {'ENABLED' if os.getenv('INVITE_ONLY', 'false').lower() == 'true' else 'DISABLED'}")
     print("=" * 70)
     yield
     # Shutdown: cleanup if needed
@@ -67,7 +72,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,  # Whitelist only - CRITICAL CHANGE
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # Explicit methods
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],  # Explicit methods
     allow_headers=["Authorization", "Content-Type", "X-Requested-With", "X-API-Key"],  # Explicit headers
     max_age=600,  # Cache preflight requests for 10 minutes
 )
@@ -88,6 +93,10 @@ app.include_router(oauth_router.router)
 app.include_router(roles_router.router)
 app.include_router(api_keys_router.router)
 app.include_router(invitations_router.router)
+app.include_router(feature_flags_router.router)
+
+# Load plugins (Phase 3) — scans plugins/ directory and auto-registers routers
+load_plugins(app)
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -103,3 +112,36 @@ async def root():
 async def health_check():
     """Health check endpoint."""
     return {"status": "healthy"}
+
+
+# ─── Phase 3: Developer Tools export endpoints ────────────────────────────────
+
+@app.get(
+    "/api/admin/export/openapi",
+    tags=["developer-tools"],
+    summary="Export OpenAPI specification",
+)
+async def export_openapi(_=Depends(get_current_admin_user)):
+    """Return the raw OpenAPI 3.x spec as JSON (available in all environments)."""
+    return app.openapi()
+
+
+@app.get(
+    "/api/admin/export/typescript-client",
+    tags=["developer-tools"],
+    summary="Download auto-generated TypeScript client",
+)
+async def export_typescript_client(_=Depends(get_current_admin_user)):
+    """
+    Generate and return a typed TypeScript client derived from the current OpenAPI spec.
+    The file is streamed as a downloadable attachment.
+    """
+    from app.ts_generator import generate_typescript_client
+
+    spec = app.openapi()
+    ts_source = generate_typescript_client(spec)
+    return Response(
+        content=ts_source,
+        media_type="text/plain; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="client.ts"'},
+    )

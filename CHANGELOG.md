@@ -2,6 +2,44 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0] - 2026-03-02
+
+### Added — Phase 3: Developer Experience
+
+#### Scaffold CLI
+- `python -m scaffold router <name>` generates a stub CRUD router (`app/routers/<name>.py`), appends schema stubs to `app/schemas.py`, and creates a migration SQL stub in `migrations/`
+- No additional dependencies — uses `string.Template` and `pathlib`
+
+#### Auto-generated TypeScript Client
+- `GET /api/admin/export/typescript-client` — downloads a typed `client.ts` containing TypeScript interfaces for all schemas and async `fetch` wrappers for all endpoints
+- `GET /api/admin/export/openapi` — returns the raw OpenAPI 3.x JSON spec in all environments (including production)
+- New "Developer Tools" section in the admin portal with one-click download
+
+#### Plugin Architecture
+- `plugins/` directory at the project root — drop a Python package with `__init__.py` there to have it auto-loaded on startup
+- Plugin loader (`plugins/__init__.py`) exports `load_plugins(app)` which scans `plugins/`, imports each sub-package, and registers any `router` attribute with the FastAPI app
+- `plugins/example/` ships a reference plugin with a `GET /api/plugins/example/ping` endpoint
+- Startup banner prints `[plugins] Loaded plugin: <name>` for each discovered plugin
+
+#### Feature Flags
+- New `feature_flags` table (migration `005_phase3.sql`) with 4 seeded default flags: `registration`, `oauth_login`, `api_keys`, `invitations`
+- Admin CRUD: `GET/POST /api/admin/feature-flags`, `PUT/DELETE /api/admin/feature-flags/{name}`
+- Public read: `GET /api/feature-flags/{name}` — returns `{"name": str, "enabled": bool}`
+- "Feature Flags" section in the admin portal with toggle switches and inline create form
+- Seeded flags are protected from deletion (toggle only)
+
+#### Environment Config Profiles
+- New `app/settings.py` — centralised `Settings` class (pydantic-settings) that loads `.env` base + `.env.{APP_ENV}` overlay
+- `APP_ENV` env var selects the active profile: `development` (default), `staging`, `production`
+- Startup banner now prints `Environment (APP_ENV):`
+- `.env.example` documents all ~40 environment variables
+- `.env.development.example`, `.env.staging.example`, `.env.production.example` provide profile-specific override templates
+
+#### Other
+- `feature_flags:manage` added to the canonical `SCOPES` list in `app/permissions.py`
+
+---
+
 ## [1.2.1] - 2026-03-02
 
 ### Changed — dependency upgrades

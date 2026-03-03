@@ -324,3 +324,28 @@ class AdminUserUpdateV2(AdminUserUpdate):
 
 class UserCreateV2(UserCreate):
     invite_token: Optional[str] = None
+
+
+# ─── Phase 3: Feature Flags ───────────────────────────────────────────────────
+
+class FeatureFlagCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    is_enabled: bool = False
+
+
+class FeatureFlagUpdate(BaseModel):
+    description: Optional[str] = None
+    is_enabled: Optional[bool] = None
+
+
+class FeatureFlagResponse(BaseModel):
+    id: int
+    name: str
+    description: Optional[str] = None
+    is_enabled: bool
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True

@@ -24,6 +24,8 @@
             <a href="#backups" class="nav-link" onclick="showSection('backups')">Backups</a>
             <a href="#certificates" class="nav-link" onclick="showSection('certificates')">Certificates</a>
             <a href="#invitations" class="nav-link" onclick="showSection('invitations')">Invitations</a>
+            <a href="#feature-flags" class="nav-link" onclick="showSection('feature-flags')">Feature Flags</a>
+            <a href="#developer-tools" class="nav-link" onclick="showSection('developer-tools')">Developer Tools</a>
             <a href="#myaccount" class="nav-link" onclick="showSection('myaccount')">My Account</a>
             <a href="#about" class="nav-link" onclick="showSection('about')">About</a>
         </div>
@@ -876,6 +878,101 @@
                     <button type="submit" class="btn-primary" id="create-invitation-submit-btn">Create</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Feature Flags Section -->
+    <div id="feature-flags-section" class="content-section">
+        <div class="section-header">
+            <h2>Feature Flags</h2>
+            <button onclick="showCreateFlagForm()" class="btn-primary">+ New Flag</button>
+        </div>
+
+        <!-- Create Flag Form (hidden by default) -->
+        <div id="create-flag-form" class="dashboard-card" style="display:none; margin-bottom:24px;">
+            <h3><i class="bi bi-flag"></i> New Feature Flag</h3>
+            <div id="flag-create-error" class="alert alert-danger" style="display:none;"></div>
+            <form onsubmit="createFeatureFlag(event)" class="mt-3">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Name <span class="text-muted">(snake_case)</span></label>
+                        <input type="text" id="flag-name" class="form-control" placeholder="e.g. dark_mode" required>
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label">Description</label>
+                        <input type="text" id="flag-description" class="form-control" placeholder="Optional description">
+                    </div>
+                    <div class="col-md-3 d-flex align-items-end gap-2">
+                        <div class="form-check form-switch mt-2">
+                            <input class="form-check-input" type="checkbox" id="flag-enabled">
+                            <label class="form-check-label" for="flag-enabled">Enabled</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3 d-flex gap-2">
+                    <button type="submit" class="btn-primary">Create</button>
+                    <button type="button" onclick="hideFlagForm()" class="btn-secondary">Cancel</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Flags Table -->
+        <div class="dashboard-card">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Description</th>
+                        <th>Status</th>
+                        <th>Updated</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="feature-flags-tbody">
+                    <tr><td colspan="5" style="text-align:center;">Loading…</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Developer Tools Section -->
+    <div id="developer-tools-section" class="content-section">
+        <div class="section-header">
+            <h2>Developer Tools</h2>
+            <p>Scaffolding, exports, and integration resources</p>
+        </div>
+
+        <!-- TypeScript Client Export -->
+        <div class="dashboard-card" style="margin-bottom:24px;">
+            <h3><i class="bi bi-filetype-tsx"></i> TypeScript Client</h3>
+            <p>Download an auto-generated TypeScript SDK derived from the live OpenAPI specification. The file contains typed interfaces for all schemas and async <code>fetch</code> wrapper functions for every endpoint.</p>
+            <div class="d-flex gap-2 mt-3">
+                <a href="/api/admin/export/typescript-client" class="btn-primary" download="client.ts">
+                    <i class="bi bi-download"></i> Download client.ts
+                </a>
+                <a href="/api/admin/export/openapi" class="btn-secondary" target="_blank">
+                    <i class="bi bi-braces"></i> View OpenAPI JSON
+                </a>
+            </div>
+        </div>
+
+        <!-- Scaffold CLI -->
+        <div class="dashboard-card" style="margin-bottom:24px;">
+            <h3><i class="bi bi-terminal"></i> Scaffold CLI</h3>
+            <p>Generate boilerplate for new resources from the command line. Run from the project root:</p>
+            <pre class="bg-light border rounded p-3 mt-2"><code>python -m scaffold router &lt;name&gt;</code></pre>
+            <p class="text-muted mt-2">This creates a stub router in <code>app/routers/</code>, appends schema classes to <code>app/schemas.py</code>, and generates a SQL migration stub in <code>migrations/</code>.</p>
+        </div>
+
+        <!-- Plugin Architecture -->
+        <div class="dashboard-card">
+            <h3><i class="bi bi-puzzle"></i> Plugin Architecture</h3>
+            <p>Add functionality without modifying core files. Place a Python package in the <code>plugins/</code> directory — any <code>router</code> attribute is registered automatically on startup.</p>
+            <pre class="bg-light border rounded p-3 mt-2"><code>plugins/
+  my_feature/
+    __init__.py    # export router
+    router.py      # FastAPI APIRouter</code></pre>
+            <p class="mt-2">An example plugin is available at <code>plugins/example/</code>. Test it: <code>GET /api/plugins/example/ping</code></p>
         </div>
     </div>
 

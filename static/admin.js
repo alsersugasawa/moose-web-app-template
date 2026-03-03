@@ -78,6 +78,12 @@ function showSection(sectionName) {
         case 'invitations':
             loadInvitations();
             break;
+        case 'feature-flags':
+            loadFeatureFlags();
+            break;
+        case 'developer-tools':
+            // Static section — nothing to load dynamically
+            break;
         case 'myaccount':
             loadMyAccount();
             break;
@@ -1777,5 +1783,135 @@ function copyInvitationLinkFromInput() {
             input.select();
             document.execCommand('copy');
         });
+    }
+}
+
+// ─── Feature Flags ────────────────────────────────────────────────────────────
+
+async function loadFeatureFlags() {
+    const tbody = document.getElementById('feature-flags-tbody');
+    try {
+        const response = await fetch(`${API_BASE}/api/admin/feature-flags`, {
+            headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        if (!response.ok) throw new Error('Failed to load feature flags');
+        const flags = await response.json();
+
+        if (flags.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">No feature flags found.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = flags.map(flag => `
+            <tr>
+                <td><code>${flag.name}</code></td>
+                <td>${flag.description || '<span class="text-muted">—</span>'}</td>
+                <td>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox"
+                            id="flag-toggle-${flag.name}"
+                            ${flag.is_enabled ? 'checked' : ''}
+                            onchange="toggleFeatureFlag('${flag.name}', this.checked)">
+                        <label class="form-check-label" for="flag-toggle-${flag.name}">
+                            ${flag.is_enabled
+                                ? '<span class="badge bg-success">Enabled</span>'
+                                : '<span class="badge bg-secondary">Disabled</span>'}
+                        </label>
+                    </div>
+                </td>
+                <td>${new Date(flag.updated_at).toLocaleDateString()}</td>
+                <td>
+                    <button onclick="deleteFeatureFlag('${flag.name}')"
+                        class="btn btn-sm btn-outline-danger"
+                        title="Delete flag">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    } catch (error) {
+        tbody.innerHTML = `<tr><td colspan="5" class="text-danger">${error.message}</td></tr>`;
+    }
+}
+
+async function toggleFeatureFlag(name, enabled) {
+    try {
+        const response = await fetch(`${API_BASE}/api/admin/feature-flags/${name}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${adminToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ is_enabled: enabled })
+        });
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.detail || 'Failed to update flag');
+        }
+        // Refresh table to update badge labels
+        loadFeatureFlags();
+    } catch (error) {
+        alert(`Error: ${error.message}`);
+        loadFeatureFlags();  // revert toggle on failure
+    }
+}
+
+async function deleteFeatureFlag(name) {
+    if (!confirm(`Delete feature flag "${name}"? This cannot be undone.`)) return;
+    try {
+        const response = await fetch(`${API_BASE}/api/admin/feature-flags/${name}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.detail || 'Failed to delete flag');
+        }
+        loadFeatureFlags();
+    } catch (error) {
+        alert(`Error: ${error.message}`);
+    }
+}
+
+function showCreateFlagForm() {
+    document.getElementById('create-flag-form').style.display = 'block';
+    document.getElementById('flag-name').focus();
+}
+
+function hideFlagForm() {
+    document.getElementById('create-flag-form').style.display = 'none';
+    document.getElementById('flag-name').value = '';
+    document.getElementById('flag-description').value = '';
+    document.getElementById('flag-enabled').checked = false;
+    document.getElementById('flag-create-error').style.display = 'none';
+}
+
+async function createFeatureFlag(event) {
+    event.preventDefault();
+    const errorDiv = document.getElementById('flag-create-error');
+    errorDiv.style.display = 'none';
+
+    const name = document.getElementById('flag-name').value.trim();
+    const description = document.getElementById('flag-description').value.trim();
+    const is_enabled = document.getElementById('flag-enabled').checked;
+
+    try {
+        const response = await fetch(`${API_BASE}/api/admin/feature-flags`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${adminToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ name, description: description || null, is_enabled })
+        });
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.detail || 'Failed to create flag');
+        }
+        hideFlagForm();
+        loadFeatureFlags();
+    } catch (error) {
+        errorDiv.textContent = error.message;
+        errorDiv.style.display = 'block';
     }
 }

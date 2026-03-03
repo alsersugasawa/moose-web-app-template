@@ -29,15 +29,15 @@ Move beyond the binary `is_admin` flag to a proper permission model.
 
 ---
 
-## Phase 3 — Developer Experience
+## Phase 3 — Developer Experience ✅
 
 Make the template easier to extend and customize.
 
-- [ ] **Scaffold CLI** — `python -m scaffold router <name>` to generate a boilerplate router + schema + migration
-- [ ] **Auto-generated TypeScript client** — Export an OpenAPI-derived TypeScript SDK for frontend consumption
-- [ ] **Plugin architecture** — A conventions-based `plugins/` directory that auto-registers routers and models on startup
-- [ ] **Feature flags** — Database-backed on/off switches per feature, configurable from the admin portal
-- [ ] **Environment config profiles** — First-class `development`, `staging`, and `production` config sets via `.env.<env>` files
+- [x] **Scaffold CLI** — `python -m scaffold router <name>` to generate a boilerplate router + schema + migration
+- [x] **Auto-generated TypeScript client** — Export an OpenAPI-derived TypeScript SDK for frontend consumption
+- [x] **Plugin architecture** — A conventions-based `plugins/` directory that auto-registers routers and models on startup
+- [x] **Feature flags** — Database-backed on/off switches per feature, configurable from the admin portal
+- [x] **Environment config profiles** — First-class `development`, `staging`, and `production` config sets via `.env.<env>` files
 
 ---
 
@@ -122,3 +122,8 @@ Modernize and expand the frontend options.
 | API key management — `mpk_` prefixed keys, bcrypt-hashed | v1.2.0 |
 | Invite-only registration — admin-issued single-use tokens | v1.2.0 |
 | Admin portal — Invitations section + role assignment in user editor | v1.2.0 |
+| Scaffold CLI — `python -m scaffold router <name>` | v1.3.0 |
+| Auto-generated TypeScript client — `/api/admin/export/typescript-client` | v1.3.0 |
+| Plugin architecture — `plugins/` directory with auto-registration | v1.3.0 |
+| Feature flags — database-backed on/off switches, admin UI | v1.3.0 |
+| Environment config profiles — `.env.development/.staging/.production` | v1.3.0 |
