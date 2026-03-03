@@ -276,6 +276,7 @@ Or use the Minikube helper script:
 
 - **[Changelog](CHANGELOG.md)** — Version history
 - **[Roadmap](docs/ROADMAP.md)** — Planned features and enhancements
+- **[System Requirements](docs/SYSTEM_REQUIREMENTS.md)** — Functional and non-functional requirements, data model, API surface, security controls
 - **[User Guide](docs/guides/USER_GUIDE.md)** — End-user documentation
 - **[Security Compliance](docs/security/SECURITY_COMPLIANCE.md)** — ISO 27001 / NIST / OWASP ASVS mapping
 - **[Kubernetes Deployment](k8s/README.md)** — Production Kubernetes guide
