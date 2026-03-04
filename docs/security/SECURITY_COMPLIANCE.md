@@ -35,7 +35,7 @@ This document outlines the security controls implemented in the Web Platform Web
 4. **Rate Limiting** (NIST SP 800-53 SC-5, OWASP ASVS 2.2.1)
    - Global rate limiting: 100 requests/60 seconds (configurable)
    - Login rate limiting: 5 attempts/5 minutes
-   - IP-based tracking
+   - IP-based tracking using Redis sorted-set sliding window when Redis is available; falls back to in-memory per-process tracking for single-instance deployments
    - HTTP 429 responses
 
 5. **Password Policy** (OWASP ASVS 2.1.1-9, NIST SP 800-53 IA-5)
@@ -326,6 +326,8 @@ For security questions or to report vulnerabilities:
 
 ## Version History
 
+- v1.4.0 - Distributed Redis rate limiting (sorted-set sliding window); ARQ background task queue; WebSocket real-time channels; read replica routing; connection pool tuning
+- v1.3.0 - Feature flags (database-backed), plugin architecture, environment config profiles, scaffold CLI
 - v1.2.0 - Added RBAC (roles, scopes), API key auth, invite-only registration
 - v1.1.0 - Added TOTP 2FA, email verification, OAuth, session management, HTTPS/Caddy
 - v1.0.0 - Initial security compliance implementation
@@ -336,5 +338,5 @@ For security questions or to report vulnerabilities:
 
 ---
 
-*Document Last Updated: 2026-02-24*
-*Next Review Date: 2026-05-24*
+*Document Last Updated: 2026-03-03*
+*Next Review Date: 2026-06-03*

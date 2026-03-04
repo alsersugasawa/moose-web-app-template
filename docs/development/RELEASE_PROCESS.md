@@ -421,5 +421,5 @@ For questions or issues with the release process:
 
 ---
 
-**Last Updated:** 2026-01-22
-**Current Version:** 3.0.0
+**Last Updated:** 2026-03-03
+**Current Version:** 1.4.0
