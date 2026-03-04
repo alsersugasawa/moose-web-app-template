@@ -94,6 +94,24 @@ class Settings(BaseSettings):
     # ── App base URL (used in email links + ARQ worker) ───────────────────────
     app_base_url: str = "http://localhost:8080"
 
+    # ── Phase 5: Structured logging ───────────────────────────────────────────
+    log_level: str = "INFO"    # DEBUG | INFO | WARNING | ERROR
+    log_format: str = "json"   # json (production) | text (development)
+
+    # ── Phase 5: Prometheus metrics ───────────────────────────────────────────
+    prometheus_enabled: bool = True
+
+    # ── Phase 5: OpenTelemetry tracing ────────────────────────────────────────
+    otel_enabled: bool = False
+    otel_endpoint: str = ""             # e.g. http://jaeger:4318/v1/traces
+    otel_service_name: str = "web-platform"
+
+    # ── Phase 5: Sentry error tracking ────────────────────────────────────────
+    sentry_dsn: str = ""                # empty = Sentry disabled
+
+    # ── Phase 5: Automated migration runner ───────────────────────────────────
+    auto_migrate: bool = False          # apply pending .sql files on startup
+
     model_config = SettingsConfigDict(
         # Base file first; profile file overlays on top
         env_file=[".env", f".env.{APP_ENV}"],

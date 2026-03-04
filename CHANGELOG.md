@@ -2,6 +2,50 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.0] - 2026-03-03
+
+### Added — Phase 5: Observability & Operations
+
+#### Structured JSON Logging (`app/logging_config.py`)
+- `configure_logging(level, fmt)` sets up the root logger with a `python-json-logger` JSON formatter; called first in the FastAPI lifespan so all modules inherit it automatically
+- `LOG_LEVEL` (default `INFO`) and `LOG_FORMAT` (`json` | `text`) are new settings; set `LOG_FORMAT=text` in `.env.development` for human-readable dev output
+- `RequestLoggingMiddleware` emits one structured JSON line per request: `method`, `path`, `status_code`, `duration_ms`, `client_ip`
+
+#### Prometheus Metrics (`app/metrics.py`)
+- `webapp_http_requests_total` counter — labels: `method`, `path`, `status_code`
+- `webapp_http_request_duration_seconds` histogram — labels: `method`, `path`; buckets tuned for web latencies
+- `webapp_db_pool_size / _checkedout / _overflow` gauges — updated every 15 s from the SQLAlchemy async engine
+- `PrometheusMiddleware` records counter + histogram for every request (skips `/metrics` and `/health*`)
+- `GET /metrics` — Prometheus text-format scrape endpoint; no auth required; only registered when `PROMETHEUS_ENABLED=true` (default)
+
+#### OpenTelemetry Tracing (`app/tracing.py`)
+- `init_tracing(app, engine)` bootstraps the OTel SDK with a `BatchSpanProcessor` and OTLP HTTP exporter
+- `FastAPIInstrumentor` auto-instruments all FastAPI routes; `SQLAlchemyInstrumentor` auto-instruments all DB queries — zero per-endpoint code changes required
+- Only active when `OTEL_ENABLED=true` and `OTEL_ENDPOINT` is set; complete no-op otherwise
+- `OTEL_SERVICE_NAME` defaults to `"web-platform"`
+
+#### Sentry Integration (`app/main.py` lifespan)
+- `sentry_sdk.init()` called in lifespan when `SENTRY_DSN` is non-empty; integrations: `FastApiIntegration`, `SqlalchemyIntegration`
+- `traces_sample_rate=0.1` (10% of transactions sampled for performance traces)
+- `send_default_pii=False` — no passwords or tokens sent to Sentry
+
+#### Enhanced Health Check (`app/routers/health.py`)
+- `GET /health` — unchanged fast liveness probe: `{"status": "healthy"}` with no DB I/O
+- `GET /health/detailed` — readiness probe: pings DB (`SELECT 1`), Redis (`PING`), and ARQ queue (`pool.info()`); returns `{"status": "healthy"|"degraded", "checks": {...}, "version": "1.5.0"}`; returns HTTP 503 only when the database is unreachable
+- Admin dashboard now calls `/health/detailed` to populate DB, Redis, and worker status badges
+
+#### Automated Migration Runner (`app/main.py` lifespan)
+- `_run_migrations()` runs after `init_db()` when `AUTO_MIGRATE=true` (default `false`)
+- Tracks applied files in a `schema_migrations` table (self-bootstrapping); each `.sql` file in `migrations/` applied exactly once
+- Fatal on migration error — prevents a broken schema from accepting traffic
+
+#### Infrastructure
+- `requirements.txt`: added `python-json-logger==2.0.7`, `prometheus-client==0.21.1`, `opentelemetry-api==1.30.0`, `opentelemetry-sdk==1.30.0`, `opentelemetry-instrumentation-fastapi==0.51b0`, `opentelemetry-instrumentation-sqlalchemy==0.51b0`, `opentelemetry-exporter-otlp-proto-http==1.30.0`, `sentry-sdk[fastapi]==2.24.1`
+- Startup banner updated to show Phase 5 feature status
+- `.env.example`: documents `LOG_LEVEL`, `LOG_FORMAT`, `PROMETHEUS_ENABLED`, `OTEL_ENABLED`, `OTEL_ENDPOINT`, `OTEL_SERVICE_NAME`, `SENTRY_DSN`, `AUTO_MIGRATE`
+
+---
+
 ## [1.4.0] - 2026-03-03
 
 ### Added — Phase 4: Infrastructure & Scalability

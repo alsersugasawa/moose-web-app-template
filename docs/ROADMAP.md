@@ -53,16 +53,16 @@ Prepare the platform for production load.
 
 ---
 
-## Phase 5 — Observability & Operations
+## Phase 5 — Observability & Operations ✅
 
 Instrument the application for production visibility.
 
-- [ ] **Structured JSON logging** — Replace print-based logging with structured JSON output compatible with log aggregators (Loki, Datadog, CloudWatch)
-- [ ] **Prometheus metrics endpoint** — `/metrics` endpoint exposing request counts, latency histograms, and DB pool stats
-- [ ] **OpenTelemetry tracing** — Distributed trace context propagation across services via OTLP export
-- [ ] **Sentry integration** — Automatic error capture and performance tracing with a configurable DSN
-- [ ] **Enhanced health check** — `/health/detailed` endpoint that reports the status of all dependencies (DB, cache, queue)
-- [ ] **Automated migration runner** — Run pending SQL migrations on container startup before the app starts accepting traffic
+- [x] **Structured JSON logging** — Replace print-based logging with structured JSON output compatible with log aggregators (Loki, Datadog, CloudWatch)
+- [x] **Prometheus metrics endpoint** — `/metrics` endpoint exposing request counts, latency histograms, and DB pool stats
+- [x] **OpenTelemetry tracing** — Distributed trace context propagation across services via OTLP export
+- [x] **Sentry integration** — Automatic error capture and performance tracing with a configurable DSN
+- [x] **Enhanced health check** — `/health/detailed` endpoint that reports the status of all dependencies (DB, cache, queue)
+- [x] **Automated migration runner** — Run pending SQL migrations on container startup before the app starts accepting traffic
 
 ---
 
@@ -132,3 +132,9 @@ Modernize and expand the frontend options.
 | WebSocket support — live admin stats + per-user notification channel | v1.4.0 |
 | Database read replica routing — `get_read_db()` with transparent fallback | v1.4.0 |
 | Connection pool tuning — `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, etc. | v1.4.0 |
+| Structured JSON logging — `python-json-logger`, per-request access log middleware | v1.5.0 |
+| Prometheus metrics — `/metrics` with request counter, latency histogram, DB pool gauges | v1.5.0 |
+| OpenTelemetry tracing — FastAPI + SQLAlchemy auto-instrumentation, OTLP export | v1.5.0 |
+| Sentry integration — error capture + performance tracing via configurable DSN | v1.5.0 |
+| Enhanced health check — `/health/detailed` reports DB, Redis, ARQ queue status | v1.5.0 |
+| Automated migration runner — `AUTO_MIGRATE=true` applies pending `.sql` files on startup | v1.5.0 |
