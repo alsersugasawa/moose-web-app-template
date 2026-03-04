@@ -105,6 +105,8 @@ services:
         condition: service_healthy
       db:
         condition: service_healthy
+    healthcheck:
+      disable: true
     networks:
       - webapp-network
     restart: unless-stopped
