@@ -4,7 +4,7 @@ import os
 import secrets
 import uuid as uuid_module
 from jose import JWTError, jwt
-from passlib.context import CryptContext
+import bcrypt as _bcrypt
 from fastapi import Depends, HTTPException, status, Header
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,23 +30,18 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30")
 # Set to false during migration period so old tokens without jti still work.
 REQUIRE_JTI = os.getenv("REQUIRE_JTI", "false").lower() == "true"
 
-pwd_context = CryptContext(
-    schemes=["bcrypt"],
-    deprecated="auto",
-    bcrypt__rounds=12
-)
 # auto_error=False so 401 isn't raised before the X-API-Key path runs
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login", auto_error=False)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     password_bytes = plain_password.encode('utf-8')[:72]
-    return pwd_context.verify(password_bytes, hashed_password)
+    return _bcrypt.checkpw(password_bytes, hashed_password.encode('utf-8'))
 
 
 def get_password_hash(password: str) -> str:
     password_bytes = password.encode('utf-8')[:72]
-    return pwd_context.hash(password_bytes)
+    return _bcrypt.hashpw(password_bytes, _bcrypt.gensalt(rounds=12)).decode('utf-8')
 
 
 def create_access_token(

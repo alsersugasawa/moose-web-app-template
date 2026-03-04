@@ -29,27 +29,27 @@ Move beyond the binary `is_admin` flag to a proper permission model.
 
 ---
 
-## Phase 3 — Developer Experience
+## Phase 3 — Developer Experience ✅
 
 Make the template easier to extend and customize.
 
-- [ ] **Scaffold CLI** — `python -m scaffold router <name>` to generate a boilerplate router + schema + migration
-- [ ] **Auto-generated TypeScript client** — Export an OpenAPI-derived TypeScript SDK for frontend consumption
-- [ ] **Plugin architecture** — A conventions-based `plugins/` directory that auto-registers routers and models on startup
-- [ ] **Feature flags** — Database-backed on/off switches per feature, configurable from the admin portal
-- [ ] **Environment config profiles** — First-class `development`, `staging`, and `production` config sets via `.env.<env>` files
+- [x] **Scaffold CLI** — `python -m scaffold router <name>` to generate a boilerplate router + schema + migration
+- [x] **Auto-generated TypeScript client** — Export an OpenAPI-derived TypeScript SDK for frontend consumption
+- [x] **Plugin architecture** — A conventions-based `plugins/` directory that auto-registers routers and models on startup
+- [x] **Feature flags** — Database-backed on/off switches per feature, configurable from the admin portal
+- [x] **Environment config profiles** — First-class `development`, `staging`, and `production` config sets via `.env.<env>` files
 
 ---
 
-## Phase 4 — Infrastructure & Scalability
+## Phase 4 — Infrastructure & Scalability ✅
 
 Prepare the platform for production load.
 
-- [ ] **Redis caching layer** — Cache frequently-read query results and rate-limit counters in Redis
-- [ ] **Background task queue** — Async job processing (using ARQ or Celery) for emails, exports, and long-running work
-- [ ] **WebSocket support** — Real-time push notifications and live data updates via WebSocket connections
-- [ ] **Database read replica routing** — Route read queries to a replica for horizontal read scaling
-- [ ] **Connection pool tuning guide** — Document and expose `asyncpg` pool settings via environment variables
+- [x] **Redis caching layer** — Cache frequently-read query results and rate-limit counters in Redis
+- [x] **Background task queue** — Async job processing (ARQ) for emails, exports, and long-running work
+- [x] **WebSocket support** — Real-time push notifications and live data updates via WebSocket connections
+- [x] **Database read replica routing** — Route read queries to a replica for horizontal read scaling
+- [x] **Connection pool tuning** — `asyncpg` pool settings exposed via environment variables
 
 ---
 
@@ -122,3 +122,13 @@ Modernize and expand the frontend options.
 | API key management — `mpk_` prefixed keys, bcrypt-hashed | v1.2.0 |
 | Invite-only registration — admin-issued single-use tokens | v1.2.0 |
 | Admin portal — Invitations section + role assignment in user editor | v1.2.0 |
+| Scaffold CLI — `python -m scaffold router <name>` | v1.3.0 |
+| Auto-generated TypeScript client — `/api/admin/export/typescript-client` | v1.3.0 |
+| Plugin architecture — `plugins/` directory with auto-registration | v1.3.0 |
+| Feature flags — database-backed on/off switches, admin UI | v1.3.0 |
+| Environment config profiles — `.env.development/.staging/.production` | v1.3.0 |
+| Redis caching layer — hot query cache + distributed rate limiting | v1.4.0 |
+| Background task queue — ARQ async email delivery with retry | v1.4.0 |
+| WebSocket support — live admin stats + per-user notification channel | v1.4.0 |
+| Database read replica routing — `get_read_db()` with transparent fallback | v1.4.0 |
+| Connection pool tuning — `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, etc. | v1.4.0 |

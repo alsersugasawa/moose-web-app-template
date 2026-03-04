@@ -1,6 +1,21 @@
 version: '3.8'
 
 services:
+  # Redis — cache + rate-limit store + ARQ task queue broker
+  redis:
+    image: redis:7-alpine
+    container_name: webapp-redis
+    volumes:
+      - redis_data:/data
+    networks:
+      - webapp-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # PostgreSQL Database
   db:
     image: postgres:18-alpine
@@ -32,6 +47,7 @@ services:
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/webapp
+      REDIS_URL: redis://redis:6379/0
       # Email (SMTP) — leave SMTP_HOST blank to disable (prints links to stdout in dev)
       # SMTP_HOST: smtp.example.com
       # SMTP_PORT: 587
@@ -48,6 +64,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       - ./app:/app/app
       - ./static:/app/static
@@ -63,6 +81,32 @@ services:
       # Optional: Mount SMB/NFS shares (uncomment and configure if using)
       # - smb_backups:/mnt/smb_backups
       # - nfs_backups:/mnt/nfs_backups
+    networks:
+      - webapp-network
+    restart: unless-stopped
+
+  # ARQ background worker — processes async email tasks
+  worker:
+    build: .
+    container_name: webapp-worker
+    command: ["arq", "app.worker.WorkerSettings"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/webapp
+      REDIS_URL: redis://redis:6379/0
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-noreply@example.com}
+      SMTP_TLS: ${SMTP_TLS:-true}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8080}
+    depends_on:
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    healthcheck:
+      disable: true
     networks:
       - webapp-network
     restart: unless-stopped
@@ -95,6 +139,7 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:
   caddy_data:
   caddy_config:
   # Optional: Define SMB and NFS volumes (uncomment if using file shares)

@@ -9,3 +9,6 @@ services:
   web:
     ports:
       - "8080:8000"
+    volumes:
+      - ./plugins:/app/plugins
+      - ./scaffold:/app/scaffold

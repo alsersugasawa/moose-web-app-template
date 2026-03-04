@@ -158,3 +158,15 @@ class Invitation(Base):
 
     creator = relationship("User", foreign_keys=[created_by], backref="created_invitations")
     consumer = relationship("User", foreign_keys=[used_by])
+
+
+class FeatureFlag(Base):
+    """Phase 3: Database-backed feature on/off switches."""
+    __tablename__ = "feature_flags"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), unique=True, nullable=False, index=True)
+    description = Column(String(255), nullable=True)
+    is_enabled = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

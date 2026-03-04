@@ -32,7 +32,7 @@ For manual control or if the admin portal is unavailable:
 cd /path/to/my-web-app
 
 # Create a manual backup (recommended)
-docker-compose exec web python -c "
+docker compose exec web python -c "
 from app.routers.admin import create_backup
 import asyncio
 asyncio.run(create_backup())
@@ -41,11 +41,11 @@ asyncio.run(create_backup())
 # Pull latest changes
 git pull origin main
 
-# Rebuild and restart containers
-docker-compose up -d --build
+# Rebuild and restart all services (web, worker, redis, db)
+docker compose up -d --build
 
-# Run database migrations
-docker-compose exec web alembic upgrade head
+# Run database migrations manually if needed (see Database Migrations section)
+# Migrations are SQL files in migrations/ applied via psql
 ```
 
 ### Method 3: CI/CD Automatic Updates
@@ -60,10 +60,10 @@ To deploy the update:
 
 ```bash
 # Pull the latest image
-docker-compose pull
+docker compose pull
 
 # Restart with new image
-docker-compose up -d
+docker compose up -d
 
 # Migrations run automatically on startup
 ```
@@ -77,7 +77,7 @@ docker-compose up -d
 
 **Via Command Line:**
 ```bash
-docker-compose exec web python -c "from app.routers.admin import APP_VERSION; print(APP_VERSION)"
+docker compose exec web python -c "from app.routers.admin import APP_VERSION; print(APP_VERSION)"
 ```
 
 ### Creating a New Release
@@ -108,20 +108,18 @@ Database migrations run automatically when:
 
 ### Manual Migrations
 
-If you need to run migrations manually:
+Migrations are plain SQL files in the `migrations/` directory (e.g. `001_initial.sql`, `005_phase3.sql`). Apply them in order:
 
 ```bash
-# Check current migration status
-docker-compose exec web alembic current
+# Copy the migration file into the db container and apply it
+docker cp migrations/006_example.sql webapp-db:/tmp/
+docker exec webapp-db psql -U postgres -d webapp -f /tmp/006_example.sql
+```
 
-# View migration history
-docker-compose exec web alembic history
+To check which tables exist:
 
-# Upgrade to latest
-docker-compose exec web alembic upgrade head
-
-# Rollback one version
-docker-compose exec web alembic downgrade -1
+```bash
+docker exec webapp-db psql -U postgres -d webapp -c "\dt"
 ```
 
 ## Backup and Rollback
@@ -145,13 +143,13 @@ If an update causes issues:
 2. **Via Command Line:**
    ```bash
    # Find the snapshot file
-   docker-compose exec web ls -lh /app/backups/snapshot_before_update*
+   ls -lh backups/snapshot_before_update*
 
    # Restore from snapshot
-   docker-compose exec -T db psql -U postgres -d webapp < backups/snapshot_before_update_TIMESTAMP.sql
+   docker exec -i webapp-db psql -U postgres -d webapp < backups/snapshot_before_update_TIMESTAMP.sql
 
-   # Restart application
-   docker-compose restart web
+   # Restart services
+   docker compose restart web worker
    ```
 
 ## Troubleshooting
@@ -160,31 +158,32 @@ If an update causes issues:
 
 1. Check the logs:
    ```bash
-   docker-compose logs web --tail=100
+   docker compose logs web --tail=100
+   docker compose logs worker --tail=50
    ```
 
-2. Check update script log:
+2. Verify all services are healthy:
    ```bash
-   cat /tmp/update_app.log
+   docker ps --format "table {{.Names}}\t{{.Status}}"
    ```
 
 3. Verify database connectivity:
    ```bash
-   docker-compose exec db pg_isready -U postgres
+   docker exec webapp-db pg_isready -U postgres
    ```
 
 ### Application Won't Start After Update
 
-1. Check for migration errors:
+1. Check for import or startup errors:
    ```bash
-   docker-compose exec web alembic current
+   docker compose logs web --tail=50
    ```
 
 2. Rollback to snapshot backup (see Rollback Procedure above)
 
-3. Check Docker logs:
+3. Verify Redis is reachable:
    ```bash
-   docker-compose logs web
+   docker exec webapp-redis redis-cli ping
    ```
 
 ### Lost Connection During Update
@@ -241,5 +240,5 @@ For issues or questions:
 
 ---
 
-**Last Updated:** 2026-01-22
-**Version:** 3.0.0
+**Last Updated:** 2026-03-03
+**Version:** 1.4.0

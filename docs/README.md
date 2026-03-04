@@ -5,10 +5,10 @@ Welcome to the Web Platform documentation!
 ## User Documentation
 
 - **[User Guide](guides/USER_GUIDE.md)** - Complete guide for using the application
-  - Getting started
-  - Creating and managing family trees
-  - Sharing trees with others
-  - Admin portal features
+  - Getting started and first-run setup
+  - Authentication, 2FA, OAuth, and session management
+  - API keys, profile, and notifications
+  - Admin portal features (users, roles, feature flags, developer tools)
 
 ## Deployment Guides
 

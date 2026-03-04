@@ -13,8 +13,10 @@ This script will:
 2. Configure Docker to use minikube's Docker daemon
 3. Build the application image inside minikube
 4. Deploy PostgreSQL with persistent storage
-5. Deploy the Web Platform application
-6. Wait for all pods to be ready
+5. Deploy Redis (cache + task queue broker)
+6. Deploy the Web Platform application
+7. Deploy the ARQ background worker
+8. Wait for all pods to be ready
 
 ## Manual Deployment Steps
 
@@ -96,7 +98,9 @@ kubectl get pods -n web-platform
 
 You should see:
 - 1 PostgreSQL pod (running)
+- 1 Redis pod (running)
 - 2 Web Platform web pods (running)
+- 1 ARQ worker pod (running)
 
 ### View Logs
 ```bash
@@ -223,16 +227,19 @@ minikube dashboard
 The application uses the following configuration (from [k8s/app-configmap.yaml](k8s/app-configmap.yaml)):
 
 - `DATABASE_URL`: PostgreSQL connection string
+- `REDIS_URL`: Redis connection string (e.g. `redis://redis:6379/0`)
 - `SECRET_KEY`: JWT signing key (change in production!)
-- `ENVIRONMENT`: Set to "production"
+- `APP_ENV`: Active config profile — `development`, `staging`, or `production`
+- `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `DB_POOL_TIMEOUT`, `DB_POOL_RECYCLE`: Connection pool tuning
+- `DATABASE_REPLICA_URL`: Optional read replica DSN (leave blank to use primary for reads)
 
 Database credentials are in [k8s/postgres-secrets.yaml](k8s/postgres-secrets.yaml) (base64 encoded).
 
 ## Next Steps
 
 1. **Initial Setup**: Visit `http://localhost:8080` and complete the initial setup wizard
-2. **Create Admin Account**: Follow the 3-step wizard to set your app name and create admin account
-3. **Explore Features**: Create family trees, upload photos, customize themes
+2. **Create Admin Account**: Follow the wizard to set your app name and create the admin account
+3. **Explore Features**: Manage users, roles, API keys, feature flags, and developer tools
 4. **Admin Portal**: Access admin features at the Admin Portal link after logging in
 
 ## Additional Resources

@@ -32,6 +32,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY ./app ./app
 COPY ./static ./static
 COPY ./migrations ./migrations
+COPY ./plugins ./plugins
+COPY ./scaffold ./scaffold
 
 # Create runtime directories
 RUN mkdir -p /app/backups /app/certs

@@ -14,7 +14,8 @@ from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 import base64
-from app.database import get_db
+from app.database import get_db, get_read_db
+from app.cache import get_redis, cache_get, cache_set
 from app.models import User, SystemLog, Backup, AppConfig, Role
 from app.schemas import (
     AdminUserCreate, AdminUserUpdate, AdminUserUpdateV2,
@@ -70,8 +71,16 @@ async def check_first_run_endpoint(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/config")
-async def get_app_config(db: AsyncSession = Depends(get_db)):
+async def get_app_config(
+    db: AsyncSession = Depends(get_db),
+    r=Depends(get_redis),
+):
     """Get application configuration (public endpoint)"""
+    cache_key = "admin:config"
+    cached = await cache_get(r, cache_key)
+    if cached is not None:
+        return cached
+
     # Get app name
     result = await db.execute(
         select(AppConfig).where(AppConfig.key == "app_name")
@@ -80,10 +89,12 @@ async def get_app_config(db: AsyncSession = Depends(get_db)):
     app_name = app_name_config.value if app_name_config else "Web Platform"
 
     invite_only = os.getenv("INVITE_ONLY", "false").lower() == "true"
-    return {
+    data = {
         "app_name": app_name,
         "invite_only": invite_only,
     }
+    await cache_set(r, cache_key, data, ttl=60)
+    return data
 
 
 @router.post("/setup", response_model=AdminUserResponse)
@@ -164,9 +175,14 @@ async def setup_admin(
 @router.get("/dashboard", response_model=DashboardStats)
 async def get_dashboard_stats(
     current_admin: User = Depends(get_current_admin_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    r=Depends(get_redis),
 ):
     """Get dashboard statistics"""
+    cache_key = "admin:dashboard"
+    cached = await cache_get(r, cache_key)
+    if cached is not None:
+        return cached
     # Count users
     total_users_result = await db.execute(select(func.count(User.id)))
     total_users = total_users_result.scalar()
@@ -225,7 +241,7 @@ async def get_dashboard_stats(
     disk_available_gb = disk.free / (1024**3)
     disk_percent = disk.percent
 
-    return DashboardStats(
+    stats = DashboardStats(
         total_users=total_users,
         active_users=active_users,
         recent_logs=recent_logs,
@@ -245,6 +261,8 @@ async def get_dashboard_stats(
         platform=platform.system(),
         architecture=platform.machine()
     )
+    await cache_set(r, cache_key, stats.model_dump(mode="json"), ttl=30)
+    return stats
 
 
 # User Management
@@ -253,7 +271,7 @@ async def list_users(
     skip: int = 0,
     limit: int = 100,
     current_user: User = Depends(require_permission("users:read")),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_read_db)
 ):
     """List all users"""
     from sqlalchemy.orm import selectinload
@@ -449,7 +467,7 @@ async def get_logs(
     limit: int = 100,
     level: str = None,
     current_user: User = Depends(require_permission("logs:read")),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_read_db)
 ):
     """Get system logs"""
     query = select(SystemLog)

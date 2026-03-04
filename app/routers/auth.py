@@ -22,7 +22,7 @@ from app.auth import (
     SECRET_KEY, ALGORITHM,
 )
 from app.security import generate_secure_token, PasswordValidator
-from app.email import send_verification_email, send_password_reset_email
+from app.tasks import enqueue_verification_email, enqueue_password_reset_email
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
@@ -71,7 +71,7 @@ async def register(user_data: UserCreateV2, db: AsyncSession = Depends(get_db)):
             await db.commit()
             raise
 
-    await send_verification_email(new_user.email, new_user.username, verification_token)
+    await enqueue_verification_email(new_user.email, new_user.username, verification_token)
     return new_user
 
 
@@ -177,7 +177,7 @@ async def resend_verification(
     current_user.email_verification_token = token
     current_user.email_verification_expires = datetime.utcnow() + timedelta(hours=24)
     await db.commit()
-    await send_verification_email(current_user.email, current_user.username, token)
+    await enqueue_verification_email(current_user.email, current_user.username, token)
     return {"message": "Verification email sent"}
 
 
@@ -197,7 +197,7 @@ async def forgot_password(data: ForgotPasswordRequest, db: AsyncSession = Depend
         )
         db.add(reset_token)
         await db.commit()
-        await send_password_reset_email(user.email, user.username, token_str)
+        await enqueue_password_reset_email(user.email, user.username, token_str)
     return {"message": "If that email is registered, a reset link has been sent"}
 
 
@@ -424,7 +424,7 @@ async def update_email(
     current_user.email_verification_token = generate_secure_token(32)
     current_user.email_verification_expires = datetime.utcnow() + timedelta(hours=24)
     await db.commit()
-    await send_verification_email(new_email, current_user.username, current_user.email_verification_token)
+    await enqueue_verification_email(new_email, current_user.username, current_user.email_verification_token)
     return {"message": "Email updated. Please verify your new email address."}
 
 

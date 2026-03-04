@@ -1,6 +1,6 @@
 # Web Platform — User Guide
 
-**Version:** 1.2.0
+**Version:** 1.4.0
 **Supported browsers:** Chrome 90+, Firefox 88+, Safari 14+, Edge 90+
 
 ---
@@ -15,8 +15,9 @@
 6. [API Keys](#api-keys)
 7. [Dashboard](#dashboard)
 8. [Session Management](#session-management)
-9. [Admin Portal](#admin-portal)
-10. [Troubleshooting](#troubleshooting)
+9. [Notifications](#notifications)
+10. [Admin Portal](#admin-portal)
+11. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -185,6 +186,16 @@ Each browser login creates a tracked session. You can view and revoke sessions f
 
 ---
 
+## Notifications
+
+When logged in, a real-time notification channel is opened automatically. Incoming notifications appear as a toast message in the corner of the screen and increment a badge counter in the header.
+
+- The badge resets when you log out
+- Notifications are sent by the server via WebSocket — no polling required
+- No browser extension or manual refresh is needed
+
+---
+
 ## Admin Portal
 
 The admin portal is available to administrators and users who have been granted permission scopes by their role.
@@ -217,6 +228,7 @@ Manage named roles and their permission scopes.
 | `backups:write` | Create new backups |
 | `invitations:manage` | Create and revoke invitations |
 | `roles:manage` | View role list |
+| `feature_flags:manage` | View and toggle feature flags |
 
 Seeded roles at install time: `viewer`, `editor`, `manager`.
 
@@ -240,11 +252,33 @@ Create and download database backups. Backups are stored in the `backups/` direc
 
 #### System
 
-View real-time system resource stats: CPU, memory, disk, and service statuses.
+View real-time system resource stats: CPU, memory, disk, and service statuses. When the admin dashboard is open, stats update live every 5 seconds via a WebSocket connection — no page refresh needed.
 
 #### Config
 
 View and update application-level settings: app name, invite-only mode toggle.
+
+#### Feature Flags *(admin or `feature_flags:manage` scope)*
+
+Database-backed on/off switches that control platform features without a code deployment.
+
+| Flag | Description |
+|---|---|
+| `registration` | Allow new user self-registration |
+| `oauth_login` | Allow OAuth2 social login |
+| `api_keys` | Allow users to generate API keys |
+| `invitations` | Allow admins to create invitations |
+
+- Toggle any flag using the switch in the admin portal
+- Create custom flags for your own features via **Add Flag**
+- The four built-in flags above cannot be deleted (toggle only)
+- Any service can read a flag via `GET /api/feature-flags/{name}` — returns `{"name": "...", "enabled": true/false}`
+
+#### Developer Tools *(admin only)*
+
+- **Export TypeScript Client** — Downloads a fully-typed `client.ts` file containing TypeScript interfaces for all API schemas and `fetch` wrappers for all endpoints. Ideal for building frontend applications.
+- **Export OpenAPI JSON** — Downloads the raw OpenAPI 3.x specification.
+- **Scaffold CLI** — Run `python -m scaffold router <name>` from the project root to generate a boilerplate router, schema stubs, and a migration SQL stub for a new resource.
 
 ---
 

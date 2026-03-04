@@ -125,66 +125,87 @@ class PasswordValidator:
 
 class RateLimiter:
     """
-    Rate limiting implementation for brute force protection.
+    In-process rate limiter (sliding window, per-IP).
+    Used as fallback when Redis is not configured.
     NIST SP 800-53 SC-5, OWASP ASVS 2.2.1
     """
 
     def __init__(self):
         self.requests: Dict[str, list[float]] = defaultdict(list)
-        self.login_attempts: Dict[str, list[float]] = defaultdict(list)
 
     def check_rate_limit(self, identifier: str, limit: int = RATE_LIMIT_REQUESTS,
-                        window: int = RATE_LIMIT_WINDOW_SECONDS) -> bool:
-        """
-        Check if request is within rate limit.
-
-        Args:
-            identifier: Unique identifier (IP address or user ID)
-            limit: Maximum number of requests
-            window: Time window in seconds
-
-        Returns:
-            bool: True if within limit, False if exceeded
-        """
+                         window: int = RATE_LIMIT_WINDOW_SECONDS) -> bool:
         if not RATE_LIMIT_ENABLED:
             return True
-
         current_time = time.time()
         cutoff_time = current_time - window
-
-        # Clean old requests
         self.requests[identifier] = [
-            req_time for req_time in self.requests[identifier]
-            if req_time > cutoff_time
+            t for t in self.requests[identifier] if t > cutoff_time
         ]
-
-        # Check limit
         if len(self.requests[identifier]) >= limit:
             return False
-
-        # Add current request
         self.requests[identifier].append(current_time)
         return True
 
     def check_login_rate_limit(self, identifier: str) -> bool:
-        """
-        Stricter rate limit for login attempts (OWASP ASVS 2.2.1).
-        """
         return self.check_rate_limit(
             f"login_{identifier}",
             limit=LOGIN_RATE_LIMIT,
-            window=LOGIN_RATE_WINDOW
+            window=LOGIN_RATE_WINDOW,
         )
 
     def reset_login_attempts(self, identifier: str):
-        """Reset login attempts after successful authentication."""
         key = f"login_{identifier}"
-        if key in self.requests:
-            self.requests[key] = []
+        self.requests.pop(key, None)
 
 
-# Global rate limiter instance
+# Global in-memory fallback instance
 rate_limiter = RateLimiter()
+
+
+async def redis_check_rate_limit(
+    redis_client,
+    identifier: str,
+    limit: int = RATE_LIMIT_REQUESTS,
+    window: int = RATE_LIMIT_WINDOW_SECONDS,
+) -> bool:
+    """
+    Distributed sliding-window rate limiter backed by Redis sorted sets.
+    Falls back to the in-memory limiter when redis_client is None.
+
+    Each request is stored as a member with its unix timestamp as the score.
+    Members older than `window` seconds are pruned on every call.
+    """
+    if not RATE_LIMIT_ENABLED:
+        return True
+    if redis_client is None:
+        return rate_limiter.check_rate_limit(identifier, limit, window)
+    try:
+        import uuid as _uuid
+        key = f"rl:{identifier}"
+        now = time.time()
+        cutoff = now - window
+        member = str(_uuid.uuid4())
+        pipe = redis_client.pipeline()
+        pipe.zremrangebyscore(key, 0, cutoff)
+        pipe.zadd(key, {member: now})
+        pipe.zcard(key)
+        pipe.expire(key, window)
+        results = await pipe.execute()
+        count = results[2]
+        return count <= limit
+    except Exception:
+        # Redis error — degrade gracefully to in-memory
+        return rate_limiter.check_rate_limit(identifier, limit, window)
+
+
+async def redis_check_login_rate_limit(redis_client, identifier: str) -> bool:
+    return await redis_check_rate_limit(
+        redis_client,
+        f"login:{identifier}",
+        limit=LOGIN_RATE_LIMIT,
+        window=LOGIN_RATE_WINDOW,
+    )
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -230,7 +251,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """
-    Rate limiting middleware.
+    Rate limiting middleware — uses Redis when available, in-memory otherwise.
     Implements NIST SP 800-53 SC-5, OWASP ASVS 2.2.1
     """
 
@@ -238,22 +259,21 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if not RATE_LIMIT_ENABLED:
             return await call_next(request)
 
-        # Get client identifier (IP address)
         client_ip = request.client.host if request.client else "unknown"
 
-        # Check rate limit
-        if not rate_limiter.check_rate_limit(client_ip):
+        # Try to use the Redis pool stored on app.state (set during lifespan)
+        redis_client = getattr(request.app.state, "redis", None)
+
+        allowed = await redis_check_rate_limit(redis_client, client_ip)
+        if not allowed:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Too many requests. Please try again later."
+                detail="Too many requests. Please try again later.",
             )
 
         response = await call_next(request)
-
-        # Add rate limit headers
         response.headers["X-RateLimit-Limit"] = str(RATE_LIMIT_REQUESTS)
         response.headers["X-RateLimit-Window"] = str(RATE_LIMIT_WINDOW_SECONDS)
-
         return response
 
 
