@@ -39,6 +39,54 @@ function logout() {
     window.location.href = '/static/admin-login.html';
 }
 
+// WebSocket for live admin dashboard stats
+let _dashboardWs = null;
+let _dashboardWsReconnectTimer = null;
+
+function openDashboardWs() {
+    if (_dashboardWs && (_dashboardWs.readyState === WebSocket.OPEN || _dashboardWs.readyState === WebSocket.CONNECTING)) {
+        return;
+    }
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    const url = `${proto}://${location.host}/ws/admin/stats?token=${encodeURIComponent(adminToken)}`;
+    _dashboardWs = new WebSocket(url);
+
+    _dashboardWs.onmessage = (event) => {
+        try {
+            const data = JSON.parse(event.data);
+            updateResourceValue('system-cpu-percent', data.cpu_percent, '%');
+            if (data.cpu_cores !== undefined) document.getElementById('system-cpu-cores').textContent = data.cpu_cores;
+            updateResourceValue('system-memory-percent', data.memory_percent, '%');
+            if (data.memory_total !== undefined) document.getElementById('system-memory-total').textContent = data.memory_total;
+            updateResourceValue('system-disk-percent', data.disk_percent, '%');
+            if (data.disk_total !== undefined) document.getElementById('system-disk-total').textContent = data.disk_total;
+        } catch (e) { /* ignore malformed frames */ }
+    };
+
+    _dashboardWs.onclose = () => {
+        _dashboardWs = null;
+        // Reconnect after 5s if still on dashboard
+        _dashboardWsReconnectTimer = setTimeout(() => {
+            if (document.getElementById('dashboard-section')?.classList.contains('active')) {
+                openDashboardWs();
+            }
+        }, 5000);
+    };
+
+    _dashboardWs.onerror = () => {
+        _dashboardWs?.close();
+    };
+}
+
+function closeDashboardWs() {
+    clearTimeout(_dashboardWsReconnectTimer);
+    if (_dashboardWs) {
+        _dashboardWs.onclose = null; // prevent reconnect
+        _dashboardWs.close();
+        _dashboardWs = null;
+    }
+}
+
 // Section Navigation
 function showSection(sectionName) {
     // Hide all sections
@@ -56,6 +104,13 @@ function showSection(sectionName) {
 
     // Add active class to clicked nav link
     event.target.classList.add('active');
+
+    // Manage dashboard WebSocket lifecycle
+    if (sectionName === 'dashboard') {
+        openDashboardWs();
+    } else {
+        closeDashboardWs();
+    }
 
     // Load data for section
     switch(sectionName) {

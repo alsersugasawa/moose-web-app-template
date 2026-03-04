@@ -1,6 +1,8 @@
 // Global state
 let authToken = localStorage.getItem('authToken');
 let currentUser = null;
+let _notifWs = null;
+let _notifBadgeCount = 0;
 let pendingTotpToken = null;   // short-lived token held during 2FA login step (never in localStorage)
 let pendingResetToken = null;  // password-reset token from ?reset_token= URL param
 let inviteOnlyMode = false;    // set by loadAppConfig()
@@ -74,6 +76,61 @@ function showAuth() {
     document.getElementById('app-container').style.display = 'none';
 }
 
+// ─── Notification WebSocket ───────────────────────────────────────────────────
+
+function openNotificationsWs() {
+    if (_notifWs && (_notifWs.readyState === WebSocket.OPEN || _notifWs.readyState === WebSocket.CONNECTING)) return;
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    _notifWs = new WebSocket(`${proto}://${location.host}/ws/notifications?token=${encodeURIComponent(authToken)}`);
+
+    _notifWs.onmessage = (event) => {
+        try {
+            const msg = JSON.parse(event.data);
+            if (msg.type === 'ping' || msg.type === 'connected') return;
+            _notifBadgeCount++;
+            _renderNotifBadge();
+            _showNotifToast(msg.message || 'New notification');
+        } catch (_) {}
+    };
+
+    _notifWs.onclose = () => { _notifWs = null; };
+    _notifWs.onerror = () => { _notifWs?.close(); };
+}
+
+function closeNotificationsWs() {
+    if (_notifWs) {
+        _notifWs.onclose = null;
+        _notifWs.close();
+        _notifWs = null;
+    }
+    _notifBadgeCount = 0;
+    _renderNotifBadge();
+}
+
+function _renderNotifBadge() {
+    const badge = document.getElementById('notif-badge');
+    if (!badge) return;
+    badge.textContent = _notifBadgeCount;
+    badge.style.display = _notifBadgeCount > 0 ? 'inline-block' : 'none';
+}
+
+function _showNotifToast(message) {
+    let container = document.getElementById('notif-toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'notif-toast-container';
+        container.style.cssText = 'position:fixed;bottom:1rem;right:1rem;z-index:9999;display:flex;flex-direction:column;gap:0.5rem;';
+        document.body.appendChild(container);
+    }
+    const toast = document.createElement('div');
+    toast.style.cssText = 'background:#333;color:#fff;padding:0.75rem 1rem;border-radius:6px;min-width:220px;box-shadow:0 2px 8px rgba(0,0,0,0.3);';
+    toast.textContent = message;
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), 5000);
+}
+
+// ─── App entry / exit ─────────────────────────────────────────────────────────
+
 function showApp() {
     document.getElementById('auth-container').style.display = 'none';
     document.getElementById('app-container').style.display = '';
@@ -97,6 +154,7 @@ function showApp() {
         banner.style.cssText = 'display: flex !important;';
     }
 
+    openNotificationsWs();
     renderDashboard();
 }
 
@@ -566,6 +624,7 @@ async function revokeAllSessions() {
 function handleLogout() { logout(); }
 
 function logout() {
+    closeNotificationsWs();
     authToken = null;
     currentUser = null;
     pendingTotpToken = null;

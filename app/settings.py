@@ -76,6 +76,24 @@ class Settings(BaseSettings):
     # ── Caddy ─────────────────────────────────────────────────────────────────
     caddy_admin_url: str = "http://caddy:2019"
 
+    # ── Phase 4: Redis ────────────────────────────────────────────────────────
+    # Empty string disables Redis (falls back to in-memory rate limiting, no cache)
+    redis_url: str = ""
+
+    # ── Phase 4: Database pool tuning ─────────────────────────────────────────
+    db_pool_size: int = 5
+    db_max_overflow: int = 10
+    db_pool_timeout: int = 30
+    db_pool_recycle: int = 1800   # recycle connections after 30 minutes
+    db_echo: bool = False          # log SQL (dev only)
+
+    # ── Phase 4: Read replica ─────────────────────────────────────────────────
+    # Empty string = reads fall back to the primary (write) connection
+    database_replica_url: str = ""
+
+    # ── App base URL (used in email links + ARQ worker) ───────────────────────
+    app_base_url: str = "http://localhost:8080"
+
     model_config = SettingsConfigDict(
         # Base file first; profile file overlays on top
         env_file=[".env", f".env.{APP_ENV}"],

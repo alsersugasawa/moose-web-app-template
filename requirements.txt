@@ -23,3 +23,6 @@ itsdangerous==2.2.0
 pyotp==2.9.0
 qrcode[pil]==8.2
 Pillow==12.1.1
+# Phase 4: Redis cache + ARQ task queue
+redis[asyncio]==5.3.0
+arq==0.26.1

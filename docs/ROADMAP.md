@@ -41,15 +41,15 @@ Make the template easier to extend and customize.
 
 ---
 
-## Phase 4 — Infrastructure & Scalability
+## Phase 4 — Infrastructure & Scalability ✅
 
 Prepare the platform for production load.
 
-- [ ] **Redis caching layer** — Cache frequently-read query results and rate-limit counters in Redis
-- [ ] **Background task queue** — Async job processing (using ARQ or Celery) for emails, exports, and long-running work
-- [ ] **WebSocket support** — Real-time push notifications and live data updates via WebSocket connections
-- [ ] **Database read replica routing** — Route read queries to a replica for horizontal read scaling
-- [ ] **Connection pool tuning guide** — Document and expose `asyncpg` pool settings via environment variables
+- [x] **Redis caching layer** — Cache frequently-read query results and rate-limit counters in Redis
+- [x] **Background task queue** — Async job processing (ARQ) for emails, exports, and long-running work
+- [x] **WebSocket support** — Real-time push notifications and live data updates via WebSocket connections
+- [x] **Database read replica routing** — Route read queries to a replica for horizontal read scaling
+- [x] **Connection pool tuning** — `asyncpg` pool settings exposed via environment variables
 
 ---
 
@@ -127,3 +127,8 @@ Modernize and expand the frontend options.
 | Plugin architecture — `plugins/` directory with auto-registration | v1.3.0 |
 | Feature flags — database-backed on/off switches, admin UI | v1.3.0 |
 | Environment config profiles — `.env.development/.staging/.production` | v1.3.0 |
+| Redis caching layer — hot query cache + distributed rate limiting | v1.4.0 |
+| Background task queue — ARQ async email delivery with retry | v1.4.0 |
+| WebSocket support — live admin stats + per-user notification channel | v1.4.0 |
+| Database read replica routing — `get_read_db()` with transparent fallback | v1.4.0 |
+| Connection pool tuning — `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, etc. | v1.4.0 |

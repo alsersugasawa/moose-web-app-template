@@ -10,11 +10,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import List
 
-from app.database import get_db
+from app.database import get_db, get_read_db
 from app.models import FeatureFlag, User
 from app.schemas import FeatureFlagCreate, FeatureFlagUpdate, FeatureFlagResponse
 from app.auth import get_current_admin_user
 from app.permissions import require_permission
+from app.cache import get_redis, cache_get, cache_set, cache_delete
 
 router = APIRouter(tags=["feature-flags"])
 
@@ -58,6 +59,7 @@ async def update_feature_flag(
     data: FeatureFlagUpdate,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_admin_user),
+    r=Depends(get_redis),
 ):
     result = await db.execute(select(FeatureFlag).where(FeatureFlag.name == name))
     flag = result.scalar_one_or_none()
@@ -69,6 +71,7 @@ async def update_feature_flag(
         flag.is_enabled = data.is_enabled
     await db.commit()
     await db.refresh(flag)
+    await cache_delete(r, f"feature_flag:{name}")
     return flag
 
 
@@ -77,6 +80,7 @@ async def delete_feature_flag(
     name: str,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_admin_user),
+    r=Depends(get_redis),
 ):
     result = await db.execute(select(FeatureFlag).where(FeatureFlag.name == name))
     flag = result.scalar_one_or_none()
@@ -89,16 +93,28 @@ async def delete_feature_flag(
         )
     await db.delete(flag)
     await db.commit()
+    await cache_delete(r, f"feature_flag:{name}")
     return {"message": f"Feature flag '{name}' deleted."}
 
 
 # ─── Public read ──────────────────────────────────────────────────────────────
 
 @router.get("/api/feature-flags/{name}")
-async def get_feature_flag(name: str, db: AsyncSession = Depends(get_db)):
+async def get_feature_flag(
+    name: str,
+    db: AsyncSession = Depends(get_read_db),
+    r=Depends(get_redis),
+):
     """Public endpoint — returns whether a named feature flag is enabled."""
+    cache_key = f"feature_flag:{name}"
+    cached = await cache_get(r, cache_key)
+    if cached is not None:
+        return cached
+
     result = await db.execute(select(FeatureFlag).where(FeatureFlag.name == name))
     flag = result.scalar_one_or_none()
     if flag is None:
         raise HTTPException(status_code=404, detail="Feature flag not found.")
-    return {"name": flag.name, "enabled": flag.is_enabled}
+    data = {"name": flag.name, "enabled": flag.is_enabled}
+    await cache_set(r, cache_key, data, ttl=30)
+    return data
