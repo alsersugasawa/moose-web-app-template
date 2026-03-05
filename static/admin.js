@@ -192,9 +192,9 @@ async function loadDashboard() {
         document.getElementById('system-platform').textContent = data.platform;
         document.getElementById('system-arch').textContent = data.architecture;
 
-        // Update service statuses
-        updateServiceStatus('service-web', true); // Assume running if we got response
-        checkDatabaseStatus();
+        // Update service statuses via /health/detailed (Phase 5)
+        updateServiceStatus('service-web', true); // Assume running if we got a response
+        checkServiceHealth();
         checkFileStorageStatus();
 
         // Display recent logs
@@ -929,7 +929,38 @@ function updateServiceStatus(serviceId, isRunning) {
     statusDot.classList.add(isRunning ? 'status-running' : 'status-stopped');
 }
 
-// Check database status
+// Phase 5: Check all service dependencies via /health/detailed
+async function checkServiceHealth() {
+    try {
+        const response = await fetch(`${API_BASE}/health/detailed`);
+        if (!response.ok && response.status !== 503) {
+            // Endpoint not available (older build) — fall back to basic check
+            checkDatabaseStatus();
+            return;
+        }
+        const data = await response.json();
+        const checks = data.checks || {};
+
+        // Database
+        updateServiceStatus('service-db', checks.database?.status === 'ok');
+
+        // Redis — update badge if element exists
+        if (document.getElementById('service-redis')) {
+            const redisOk = checks.redis?.status === 'ok' || checks.redis?.status === 'disabled';
+            updateServiceStatus('service-redis', redisOk);
+        }
+
+        // Worker queue — update badge if element exists
+        if (document.getElementById('service-worker')) {
+            const workerOk = checks.worker_queue?.status === 'ok' || checks.worker_queue?.status === 'disabled';
+            updateServiceStatus('service-worker', workerOk);
+        }
+    } catch (error) {
+        checkDatabaseStatus();
+    }
+}
+
+// Check database status (legacy fallback)
 async function checkDatabaseStatus() {
     try {
         const response = await fetch(`${API_BASE}/health`);

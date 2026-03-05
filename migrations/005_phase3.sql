@@ -12,10 +12,11 @@ CREATE TABLE IF NOT EXISTS feature_flags (
 
 CREATE INDEX IF NOT EXISTS idx_feature_flags_name ON feature_flags(name);
 
--- Seed default flags
-INSERT INTO feature_flags (name, description, is_enabled) VALUES
-    ('registration', 'Allow new user self-registration',    true),
-    ('oauth_login',  'Allow OAuth2 social login',           true),
-    ('api_keys',     'Allow users to generate API keys',    true),
-    ('invitations',  'Allow admins to create invitations',  true)
+-- Seed default flags (explicit timestamps required when table is pre-created by SQLAlchemy
+-- with Python-side defaults only — no SQL DEFAULT CURRENT_TIMESTAMP server default)
+INSERT INTO feature_flags (name, description, is_enabled, created_at, updated_at) VALUES
+    ('registration', 'Allow new user self-registration',    true, NOW(), NOW()),
+    ('oauth_login',  'Allow OAuth2 social login',           true, NOW(), NOW()),
+    ('api_keys',     'Allow users to generate API keys',    true, NOW(), NOW()),
+    ('invitations',  'Allow admins to create invitations',  true, NOW(), NOW())
 ON CONFLICT (name) DO NOTHING;
