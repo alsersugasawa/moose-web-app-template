@@ -1,4 +1,4 @@
-# Web Platform Template v1.2.0
+# Web App Template v1.2.0
 
 A full-stack web application template with authentication, role-based access control, admin portal, and production-ready infrastructure.
 
