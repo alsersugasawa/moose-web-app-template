@@ -1,6 +1,6 @@
-# Web App Template v1.2.0
+# Web App Template v1.6.0
 
-A full-stack web application template with authentication, role-based access control, admin portal, and production-ready infrastructure.
+A full-stack web application template with authentication, role-based access control, admin portal, real-time features, background jobs, observability, and production-ready infrastructure.
 
 ## Features
 
@@ -27,6 +27,35 @@ A full-stack web application template with authentication, role-based access con
 - **HTTPS Support** — TLS termination via Caddy with automatic Let's Encrypt certificate provisioning
 - **Certificate Management UI** — View certificate status, trigger renewal, and upload custom PEM/PFX certs
 
+### Developer Experience
+- **Scaffold CLI** — `python -m scaffold router <name>` generates a stub CRUD router, schema stubs, and a migration SQL stub
+- **Auto-generated TypeScript Client** — `/api/admin/export/typescript-client` downloads a fully-typed `client.ts` for frontend consumption
+- **Plugin Architecture** — Drop a Python package into `plugins/` and it is auto-loaded and registered on startup
+- **Feature Flags** — Database-backed on/off switches configurable from the admin portal; public read via `/api/feature-flags/{name}`
+- **Environment Config Profiles** — First-class `development`, `staging`, and `production` config sets via `.env.<env>` overlay files
+
+### Infrastructure & Scalability
+- **Redis Caching Layer** — Cache hot query results (app config, dashboard, feature flags) with configurable TTLs
+- **Distributed Rate Limiting** — Redis sliding-window rate limiting with in-process fallback
+- **Background Task Queue** — ARQ async job queue for email delivery and long-running tasks; inline fallback when Redis is absent
+- **WebSocket Support** — Live admin stats dashboard and per-user notification push channel
+- **Database Read Replica Routing** — `get_read_db()` dependency transparently routes reads to a replica when `DATABASE_REPLICA_URL` is set
+- **Connection Pool Tuning** — `asyncpg` pool settings exposed via environment variables
+
+### Observability & Operations
+- **Structured JSON Logging** — `python-json-logger` with per-request access log middleware; `LOG_FORMAT=text` for human-readable dev output
+- **Prometheus Metrics** — `/metrics` endpoint with request counter, latency histogram, and DB pool gauges
+- **OpenTelemetry Tracing** — FastAPI + SQLAlchemy auto-instrumentation with OTLP HTTP export
+- **Sentry Integration** — Automatic error capture and performance tracing via configurable DSN
+- **Enhanced Health Check** — `/health/detailed` reports DB, Redis, and ARQ queue status; returns HTTP 503 on DB failure
+- **Automated Migration Runner** — `AUTO_MIGRATE=true` applies pending `.sql` files from `migrations/` on container startup
+
+### Communication & Events
+- **Internal Event Bus** — Lightweight pub/sub `emit()`/`on()` system for decoupled domain events (`user.registered`, `user.login`)
+- **In-App Notification System** — Per-user notification inbox with read/unread state; REST API + WebSocket push delivery
+- **Webhook Delivery** — Register URLs to receive HMAC-SHA256 signed POST payloads on defined events; delivery history and ARQ retry
+- **Transactional Email** — Welcome email sent automatically on registration via ARQ task
+
 ### Security & Infrastructure
 - **Rate Limiting** — Configurable per-IP request rate limits
 - **Security Headers** — HSTS, CSP, X-Frame-Options, and more (OWASP ASVS 14.4)
@@ -37,11 +66,14 @@ A full-stack web application template with authentication, role-based access con
 
 ## Tech Stack
 
-- **Backend**: FastAPI, SQLAlchemy 2.0 (async), PostgreSQL 14, uvicorn
+- **Backend**: FastAPI, SQLAlchemy 2.0 (async), PostgreSQL 18, uvicorn
 - **Frontend**: HTML, CSS, JavaScript, Bootstrap 5.3
 - **Authentication**: JWT (python-jose), bcrypt (passlib), TOTP (pyotp), OAuth 2.0 (authlib)
 - **Image Processing**: Pillow (avatar resize)
 - **Email**: aiosmtplib (async SMTP)
+- **Caching / Queue**: Redis, ARQ (background tasks)
+- **Real-time**: WebSockets (built-in FastAPI)
+- **Observability**: python-json-logger, prometheus-client, opentelemetry, sentry-sdk
 - **Reverse Proxy / TLS**: Caddy 2 (production)
 - **Monitoring**: psutil for system resource tracking
 - **Containerization**: Docker, Docker Compose
@@ -88,7 +120,7 @@ Caddy automatically provisions and renews a Let's Encrypt certificate. No manual
 
 **Option 3: Local Development**
 - Python 3.10+
-- PostgreSQL 14
+- PostgreSQL 18
 - pip
 
 ## Setup Instructions
@@ -164,6 +196,8 @@ Or use the Minikube helper script:
    psql webapp < migrations/002_add_app_config.sql
    psql webapp < migrations/003_phase1.sql
    psql webapp < migrations/004_phase2.sql
+   psql webapp < migrations/005_phase3.sql
+   psql webapp < migrations/006_phase6.sql
    ```
 
 4. **Start the server**
@@ -178,6 +212,7 @@ Or use the Minikube helper script:
 | `SECRET_KEY` | *(required)* | JWT signing secret — use a long random string |
 | `DATABASE_URL` | `postgresql+asyncpg://postgres:postgres@db/webapp` | PostgreSQL connection string |
 | `ENVIRONMENT` | `development` | `development` enables `/docs` and `/redoc` |
+| `APP_ENV` | `development` | Config profile: `development`, `staging`, `production` |
 | `CORS_ORIGINS` | `http://localhost:8080,...` | Comma-separated list of allowed CORS origins |
 | `TRUSTED_HOSTS` | `localhost,127.0.0.1,*.localhost` | Comma-separated trusted Host header values |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `30` | JWT token lifetime |
@@ -213,27 +248,65 @@ Or use the Minikube helper script:
 | `CADDY_DOMAIN` | `localhost` | Domain name for TLS certificate |
 | `CADDY_EMAIL` | `admin@example.com` | Let's Encrypt account email |
 
+### Redis & Background Tasks
+
+| Variable | Default | Description |
+|---|---|---|
+| `REDIS_URL` | *(unset)* | Redis connection URL (e.g. `redis://redis:6379`); caching and ARQ disabled if unset |
+| `DATABASE_REPLICA_URL` | *(unset)* | Read replica connection string; falls back to primary if unset |
+| `DB_POOL_SIZE` | `5` | asyncpg connection pool size |
+| `DB_MAX_OVERFLOW` | `10` | Maximum pool overflow connections |
+| `DB_POOL_TIMEOUT` | `30` | Pool checkout timeout in seconds |
+| `DB_POOL_RECYCLE` | `1800` | Connection recycle interval in seconds |
+| `DB_ECHO` | `false` | Log all SQL statements |
+
+### Observability
+
+| Variable | Default | Description |
+|---|---|---|
+| `LOG_LEVEL` | `INFO` | Root log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
+| `LOG_FORMAT` | `json` | Log format: `json` (structured) or `text` (human-readable) |
+| `PROMETHEUS_ENABLED` | `true` | Expose `/metrics` Prometheus scrape endpoint |
+| `OTEL_ENABLED` | `false` | Enable OpenTelemetry tracing |
+| `OTEL_ENDPOINT` | *(unset)* | OTLP HTTP exporter endpoint |
+| `OTEL_SERVICE_NAME` | `web-platform` | Service name reported in traces |
+| `SENTRY_DSN` | *(unset)* | Sentry DSN for error and performance monitoring |
+| `AUTO_MIGRATE` | `false` | Run pending SQL migrations automatically on startup |
+
 ## Project Structure
 
 ```
 .
 ├── app/
-│   ├── main.py              # FastAPI application entry point
-│   ├── models.py            # SQLAlchemy ORM models (User, Role, ApiKey, Invitation, …)
+│   ├── main.py              # FastAPI application entry point and lifespan
+│   ├── models.py            # SQLAlchemy ORM models (User, Role, ApiKey, Notification, Webhook, …)
 │   ├── schemas.py           # Pydantic request/response schemas
 │   ├── auth.py              # JWT + API key authentication and session logic
 │   ├── permissions.py       # require_permission(scope) dependency factory
-│   ├── database.py          # Async database connection
+│   ├── database.py          # Async database connection and read replica routing
 │   ├── config.py            # App configuration
+│   ├── settings.py          # Pydantic-settings config with env profile support
 │   ├── email.py             # Async SMTP helpers (verification, password reset)
 │   ├── security.py          # Rate limiting and security header middleware
+│   ├── cache.py             # Redis caching helpers
+│   ├── worker.py            # ARQ worker settings
+│   ├── tasks.py             # Background task definitions
+│   ├── ws_manager.py        # WebSocket connection manager
+│   ├── events.py            # Internal event bus (pub/sub)
+│   ├── metrics.py           # Prometheus metrics definitions
+│   ├── tracing.py           # OpenTelemetry initialization
+│   ├── logging_config.py    # Structured JSON logging setup
 │   └── routers/
 │       ├── auth.py          # Auth endpoints (register, login, profile, TOTP, sessions, …)
 │       ├── admin.py         # Admin portal endpoints
 │       ├── oauth.py         # OAuth 2.0 redirect + callback (Google, GitHub)
 │       ├── roles.py         # Role CRUD (/api/admin/roles)
 │       ├── api_keys.py      # API key CRUD (/api/auth/api-keys)
-│       └── invitations.py   # Invitation management (/api/admin/invitations)
+│       ├── invitations.py   # Invitation management (/api/admin/invitations)
+│       ├── websocket.py     # WebSocket endpoints (admin stats, notifications)
+│       ├── notifications.py # Notification REST API (/api/notifications)
+│       ├── webhooks.py      # Webhook CRUD and delivery history (/api/webhooks)
+│       └── health.py        # Health check endpoints (/health, /health/detailed)
 ├── static/
 │   ├── index.html           # Main application page
 │   ├── app.js               # Frontend application logic
@@ -246,9 +319,14 @@ Or use the Minikube helper script:
 │   ├── 001_add_admin_features.sql
 │   ├── 002_add_app_config.sql
 │   ├── 003_phase1.sql       # Email verification, OAuth, TOTP, sessions
-│   └── 004_phase2.sql       # Roles, API keys, invitations, user profile columns
+│   ├── 004_phase2.sql       # Roles, API keys, invitations, user profile columns
+│   ├── 005_phase3.sql       # Feature flags
+│   └── 006_phase6.sql       # Notifications, webhooks, webhook_deliveries
+├── plugins/
+│   └── example/             # Reference plugin with GET /api/plugins/example/ping
 ├── docs/
 │   ├── ROADMAP.md           # Feature roadmap
+│   ├── SYSTEM_REQUIREMENTS.md
 │   ├── guides/
 │   │   └── USER_GUIDE.md    # End-user documentation
 │   ├── security/
@@ -260,17 +338,19 @@ Or use the Minikube helper script:
 ├── Caddyfile                # Caddy reverse proxy + TLS configuration
 ├── Dockerfile
 ├── docker-compose.yml       # Base Compose config (production)
-└── docker-compose.dev.yml   # Dev override (HTTP, port 8080, no Caddy)
+├── docker-compose.dev.yml   # Dev override (HTTP, port 8080, no Caddy)
+└── .env.example             # All environment variables documented
 ```
 
 ## Extending the Template
 
 1. **Add data models** in `app/models.py`
-2. **Add API routes** under `app/routers/`
+2. **Add API routes** under `app/routers/` (or use `python -m scaffold router <name>`)
 3. **Update the frontend** in `static/index.html` and `static/app.js`
 4. **Add database migrations** in `migrations/`
 5. **Define permission scopes** in `app/permissions.py` and protect endpoints with `require_permission("scope:action")`
 6. **Customize the dashboard** — use the built-in Customize panel to add cards without touching code
+7. **Add plugins** — drop a Python package with a `router` attribute into `plugins/` for auto-registration
 
 ## Documentation
 
