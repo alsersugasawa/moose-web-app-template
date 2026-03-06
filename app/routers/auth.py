@@ -23,6 +23,7 @@ from app.auth import (
 )
 from app.security import generate_secure_token, PasswordValidator
 from app.tasks import enqueue_verification_email, enqueue_password_reset_email
+from app.events import emit
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
@@ -72,6 +73,7 @@ async def register(user_data: UserCreateV2, db: AsyncSession = Depends(get_db)):
             raise
 
     await enqueue_verification_email(new_user.email, new_user.username, verification_token)
+    emit("user.registered", user_id=new_user.id, email=new_user.email, username=new_user.username)
     return new_user
 
 
@@ -109,6 +111,7 @@ async def login(user_data: UserLogin, request: Request, db: AsyncSession = Depen
     device_info = request.headers.get("User-Agent", "")[:512]
     expires_at = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     await record_session(db, user.id, jti, ip, device_info, expires_at)
+    emit("user.login", user_id=user.id, email=user.email, ip=ip)
 
     return {"access_token": access_token, "token_type": "bearer", "totp_required": False}
 

@@ -17,6 +17,8 @@ from app.routers import invitations as invitations_router
 from app.routers import feature_flags as feature_flags_router
 from app.routers import websocket as websocket_router
 from app.routers import health as health_router        # Phase 5
+from app.routers import notifications as notifications_router  # Phase 6
+from app.routers import webhooks as webhooks_router            # Phase 6
 from app.auth import get_secret_key, get_current_admin_user
 from app.security import (
     SecurityHeadersMiddleware,
@@ -84,6 +86,35 @@ async def lifespan(app: FastAPI):
     # Phase 5: Automated migration runner
     if settings.auto_migrate:
         await _run_migrations()
+
+    # Phase 6: Register event bus handlers
+    import asyncio as _asyncio
+    from app.events import on
+    from app.tasks import enqueue_user_notification, enqueue_welcome_email, enqueue_webhook_delivery
+
+    async def _dispatch_webhooks(event: str, **data) -> None:
+        """Fan-out to all active webhooks subscribed to *event*."""
+        from sqlalchemy import select
+        from app.database import async_session_maker
+        from app.models import Webhook
+        async with async_session_maker() as db:
+            result = await db.execute(
+                select(Webhook).where(Webhook.is_active == True, Webhook.events.any(event))  # noqa: E712
+            )
+            webhooks = result.scalars().all()
+        for wh in webhooks:
+            await enqueue_webhook_delivery(wh.id, event, data)
+
+    def _on_user_registered(user_id: int, email: str, username: str) -> None:
+        _asyncio.create_task(enqueue_user_notification(user_id, "Welcome! Your account is now active."))
+        _asyncio.create_task(enqueue_welcome_email(email, username))
+        _asyncio.create_task(_dispatch_webhooks("user.registered", user_id=user_id, email=email))
+
+    def _on_user_login(user_id: int, email: str, ip: str) -> None:
+        _asyncio.create_task(_dispatch_webhooks("user.login", user_id=user_id, email=email, ip=ip))
+
+    on("user.registered", _on_user_registered)
+    on("user.login", _on_user_login)
 
     # Phase 4: Redis pool (shared by cache + rate limiter)
     redis_client = await init_redis()
@@ -186,6 +217,8 @@ app.include_router(api_keys_router.router)
 app.include_router(invitations_router.router)
 app.include_router(feature_flags_router.router)
 app.include_router(websocket_router.router)        # Phase 4
+app.include_router(notifications_router.router)    # Phase 6
+app.include_router(webhooks_router.router)         # Phase 6
 
 # Phase 3: Plugin auto-loader
 load_plugins(app)
