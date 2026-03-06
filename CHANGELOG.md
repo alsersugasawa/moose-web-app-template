@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.6.0] - 2026-03-04
+
+### Added — Phase 6: Communication & Events
+
+#### Internal Event Bus (`app/events.py`)
+- Lightweight synchronous pub/sub: `on(event, handler)` registers a handler; `emit(event, **data)` calls all registered handlers
+- Exceptions in handlers are swallowed — they never crash the caller
+- Events emitted: `user.registered` (on register), `user.login` (on successful login)
+
+#### In-App Notification System
+- `Notification` ORM model: per-user message inbox with `is_read` flag
+- REST endpoints at `/api/notifications`: list, unread count, mark one/all as read, delete
+- WebSocket push via `ws_manager.send_to_user()` — existing `/ws/notifications` channel delivers `{"type":"notification","id":...,"message":"..."}` in real time
+- ARQ task `create_notification_task` + `enqueue_user_notification()` helper with inline fallback
+
+#### Webhook Delivery
+- `Webhook` + `WebhookDelivery` ORM models
+- REST CRUD at `/api/webhooks`: register, list, update, delete; `/api/webhooks/{id}/deliveries` for delivery history
+- Signing secret auto-generated on creation (`secrets.token_hex(32)`)
+- ARQ task `deliver_webhook_task`: POSTs HMAC-SHA256 signed payloads (`X-Webhook-Signature: sha256=...`), logs each delivery attempt
+- `enqueue_webhook_delivery()` helper with inline fallback for no-Redis deployments
+- Event bus fans out to all active webhooks subscribed to `user.registered` and `user.login`
+
+#### Transactional Email — Welcome Email
+- `send_welcome_email_task` ARQ task + `enqueue_welcome_email()` helper
+- Sent automatically on `user.registered` event via event bus handler
+
+#### Migration
+- `migrations/006_phase6.sql`: `notifications`, `webhooks`, `webhook_deliveries` tables with FK cascade and indexes
+
 ## [1.5.0] - 2026-03-03
 
 ### Added — Phase 5: Observability & Operations

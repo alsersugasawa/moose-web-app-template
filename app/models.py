@@ -1,6 +1,6 @@
 import uuid as uuid_module
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Text, JSON, Boolean, UniqueConstraint
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import UUID, JSONB, ARRAY
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.database import Base
@@ -170,3 +170,49 @@ class FeatureFlag(Base):
     is_enabled = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+# ── Phase 6: Communication & Events ──────────────────────────────────────────
+
+class Notification(Base):
+    """Per-user in-app notification inbox."""
+    __tablename__ = "notifications"
+
+    id         = Column(Integer, primary_key=True)
+    user_id    = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    message    = Column(Text, nullable=False)
+    is_read    = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    user = relationship("User", backref="notifications")
+
+
+class Webhook(Base):
+    """User-registered webhook endpoint that receives signed POST payloads."""
+    __tablename__ = "webhooks"
+
+    id         = Column(Integer, primary_key=True)
+    user_id    = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    url        = Column(String(500), nullable=False)
+    secret     = Column(String(64), nullable=False)
+    events     = Column(ARRAY(String), nullable=False, default=list)
+    is_active  = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    user      = relationship("User", backref="webhooks")
+    deliveries = relationship("WebhookDelivery", back_populates="webhook", cascade="all, delete-orphan")
+
+
+class WebhookDelivery(Base):
+    """Delivery attempt log for a webhook."""
+    __tablename__ = "webhook_deliveries"
+
+    id           = Column(Integer, primary_key=True)
+    webhook_id   = Column(Integer, ForeignKey("webhooks.id", ondelete="CASCADE"), nullable=False, index=True)
+    event        = Column(String(100), nullable=False)
+    payload      = Column(JSON, nullable=False, default=dict)
+    status_code  = Column(Integer, nullable=True)
+    success      = Column(Boolean, nullable=False, default=False)
+    attempted_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    webhook = relationship("Webhook", back_populates="deliveries")

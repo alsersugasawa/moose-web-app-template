@@ -349,3 +349,57 @@ class FeatureFlagResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ─── Phase 6: Notifications ───────────────────────────────────────────────────
+
+class NotificationResponse(BaseModel):
+    id: int
+    message: str
+    is_read: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class UnreadCountResponse(BaseModel):
+    count: int
+
+
+# ─── Phase 6: Webhooks ────────────────────────────────────────────────────────
+
+class WebhookCreate(BaseModel):
+    url: str
+    events: List[str] = []
+
+
+class WebhookUpdate(BaseModel):
+    url: Optional[str] = None
+    events: Optional[List[str]] = None
+    is_active: Optional[bool] = None
+
+
+class WebhookResponse(BaseModel):
+    id: int
+    url: str
+    secret: str
+    events: List[str]
+    is_active: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class WebhookDeliveryResponse(BaseModel):
+    id: int
+    webhook_id: int
+    event: str
+    payload: Dict[str, Any]
+    status_code: Optional[int] = None
+    success: bool
+    attempted_at: datetime
+
+    class Config:
+        from_attributes = True

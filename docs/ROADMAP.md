@@ -66,14 +66,14 @@ Instrument the application for production visibility.
 
 ---
 
-## Phase 6 — Communication & Events
+## ✅ Phase 6 — Communication & Events
 
 Build out messaging and integration capabilities.
 
-- [ ] **Transactional email** — SMTP / SendGrid / Mailgun integration for verification, password reset, and notification emails
-- [ ] **In-app notification system** — Per-user notification inbox with read/unread state, stored in the database
-- [ ] **Webhook delivery** — Allow users to register URLs that receive signed POST payloads on defined events
-- [ ] **Internal event bus** — Decouple components with a lightweight publish/subscribe system for domain events
+- [x] **Transactional email** — SMTP / SendGrid / Mailgun integration for verification, password reset, and notification emails
+- [x] **In-app notification system** — Per-user notification inbox with read/unread state, stored in the database
+- [x] **Webhook delivery** — Allow users to register URLs that receive signed POST payloads on defined events
+- [x] **Internal event bus** — Decouple components with a lightweight publish/subscribe system for domain events
 
 ---
 
@@ -138,3 +138,7 @@ Modernize and expand the frontend options.
 | Sentry integration — error capture + performance tracing via configurable DSN | v1.5.0 |
 | Enhanced health check — `/health/detailed` reports DB, Redis, ARQ queue status | v1.5.0 |
 | Automated migration runner — `AUTO_MIGRATE=true` applies pending `.sql` files on startup | v1.5.0 |
+| Internal event bus — lightweight pub/sub `emit()`/`on()` for domain events | v1.6.0 |
+| In-app notification system — DB-backed inbox, REST API, WebSocket push | v1.6.0 |
+| Webhook delivery — HMAC-SHA256 signed POST payloads, delivery log, ARQ retry | v1.6.0 |
+| Transactional email — welcome email on registration via ARQ task | v1.6.0 |
