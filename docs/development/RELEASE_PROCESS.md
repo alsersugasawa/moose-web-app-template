@@ -288,7 +288,7 @@ To ensure proper changelog generation, use these prefixes:
 # Minor release commits
 git commit -m "fix: resolve authentication timeout issue"
 git commit -m "security: patch XSS vulnerability in user input"
-git commit -m "perf: optimize database queries for family tree"
+git commit -m "perf: optimize database queries for user inbox"
 
 # Major release commits
 git commit -m "feat: add real-time collaboration features"
@@ -421,5 +421,5 @@ For questions or issues with the release process:
 
 ---
 
-**Last Updated:** 2026-03-03
-**Current Version:** 1.4.0
+**Last Updated:** 2026-03-05
+**Current Version:** 1.6.0
