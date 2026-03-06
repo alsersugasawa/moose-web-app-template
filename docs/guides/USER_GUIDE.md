@@ -1,6 +1,6 @@
 # Web Platform — User Guide
 
-**Version:** 1.4.0
+**Version:** 1.6.0
 **Supported browsers:** Chrome 90+, Firefox 88+, Safari 14+, Edge 90+
 
 ---
@@ -69,7 +69,7 @@ On successful login you are taken to your dashboard.
 3. If invite-only mode is active, paste your **invitation code** into the invite field
 4. Click **Register** — you will be automatically logged in
 
-Password requirements: minimum 8 characters, at least one uppercase letter, one lowercase letter, one digit, and one special character.
+Password requirements: minimum 12 characters, at least one uppercase letter, one lowercase letter, one digit, and one special character.
 
 ### Email Verification
 
@@ -117,7 +117,7 @@ Click your **username** (or display name) in the top-right header to open the pr
 | Bio | Short description shown on your profile |
 | Timezone | Used for date/time display |
 | Language | UI language preference |
-| Avatar | Upload a JPEG, PNG, or WebP image (max 2 MB); stored as 90×90 JPEG |
+| Avatar | Upload a JPEG, PNG, or WebP image (max 2 MB); stored as 200×200 JPEG |
 
 Click **Save Profile** to apply changes.
 
@@ -273,6 +273,17 @@ Database-backed on/off switches that control platform features without a code de
 - Create custom flags for your own features via **Add Flag**
 - The four built-in flags above cannot be deleted (toggle only)
 - Any service can read a flag via `GET /api/feature-flags/{name}` — returns `{"name": "...", "enabled": true/false}`
+
+#### Webhooks
+
+Register external URLs to receive signed POST payloads when platform events occur.
+
+1. Click **Add Webhook**
+2. Enter the target **URL** and select the **events** to subscribe to (`user.registered`, `user.login`)
+3. Copy the auto-generated **signing secret** — use it to verify `X-Webhook-Signature` headers on your server
+4. Click **Save**
+
+Each delivery attempt is logged and viewable via the **Deliveries** link next to a webhook. Failed deliveries are retried automatically via the background worker.
 
 #### Developer Tools *(admin only)*
 

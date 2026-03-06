@@ -1,8 +1,8 @@
 # System Requirements Specification (SRS)
 
-**Project:** Web Platform Template
-**Version:** 1.2.0
-**Date:** 2026-02-24
+**Project:** Web App Template
+**Version:** 1.6.0
+**Date:** 2026-03-05
 **Status:** Approved
 
 ---
@@ -27,7 +27,7 @@
 
 ### 1.1 Purpose
 
-This document specifies the functional and non-functional requirements for the Web Platform Template — a full-stack web application platform providing authentication, role-based access control, user management, and a configurable admin portal. It is intended as the authoritative reference for developers, operators, and stakeholders building on or deploying this template.
+This document specifies the functional and non-functional requirements for the Web App Template — a full-stack web application platform providing authentication, role-based access control, user management, real-time features, background jobs, observability, and a configurable admin portal. It is intended as the authoritative reference for developers, operators, and stakeholders building on or deploying this template.
 
 ### 1.2 Scope
 
@@ -71,7 +71,8 @@ The system provides:
 The platform is a web application comprising:
 
 - A **FastAPI** backend (REST API, served by uvicorn)
-- A **PostgreSQL 14** database (persistent storage)
+- A **PostgreSQL 18** database (persistent storage)
+- A **Redis** instance (optional — caching, distributed rate limiting, ARQ task queue)
 - A **Caddy 2** reverse proxy (production TLS termination)
 - A **Bootstrap 5.3** single-page frontend (HTML + vanilla JS, served as static files from the backend)
 
@@ -128,7 +129,7 @@ Requirements are identified as **FR-NNN** and grouped by subsystem.
 | FR-025 | Protected endpoints shall return HTTP 403 when the caller lacks the required scope |
 | FR-026 | The admin portal shall expose role CRUD under `/api/admin/roles` |
 | FR-027 | The system shall prevent deletion of a role that is assigned to one or more users (HTTP 409) |
-| FR-028 | Canonical permission scopes are: `users:read`, `users:write`, `roles:manage`, `invitations:manage`, `logs:read`, `backups:read`, `backups:write`, `system:read`, `api_keys:manage` |
+| FR-028 | Canonical permission scopes are: `users:read`, `users:write`, `roles:manage`, `invitations:manage`, `logs:read`, `backups:read`, `backups:write`, `system:read`, `api_keys:manage`, `feature_flags:manage` |
 
 ### 3.3 User Profiles
 
@@ -202,6 +203,45 @@ Requirements are identified as **FR-NNN** and grouped by subsystem.
 | FR-091 | Backups shall be stored in `/app/backups` by default; the path is configurable via `BACKUP_DIR` |
 | FR-092 | The system shall support optional backup replication to SMB/CIFS and NFS file shares |
 | FR-093 | Backups older than `BACKUP_RETENTION_DAYS` (default: 30) shall be eligible for pruning |
+
+### 3.9 Feature Flags
+
+| ID | Requirement |
+|---|---|
+| FR-100 | The system shall maintain a `feature_flags` table with `name`, `enabled`, and `description` columns |
+| FR-101 | Four flags shall be seeded at migration time: `registration`, `oauth_login`, `api_keys`, `invitations` |
+| FR-102 | Admin CRUD: `GET/POST /api/admin/feature-flags`, `PUT/DELETE /api/admin/feature-flags/{name}` |
+| FR-103 | Public read: `GET /api/feature-flags/{name}` — returns `{"name": str, "enabled": bool}` |
+| FR-104 | The four seeded flags shall be protected from deletion (toggle only) |
+
+### 3.10 Notifications
+
+| ID | Requirement |
+|---|---|
+| FR-110 | The system shall maintain a per-user notification inbox backed by a `notifications` table |
+| FR-111 | REST endpoints at `/api/notifications`: list, unread count, mark one/all as read, delete |
+| FR-112 | Real-time delivery via WebSocket push to the authenticated user's notification channel |
+| FR-113 | Notifications may be enqueued via ARQ task `create_notification_task` with inline fallback |
+
+### 3.11 Webhooks
+
+| ID | Requirement |
+|---|---|
+| FR-120 | Users shall be able to register, list, update, and delete webhook endpoints via `/api/webhooks` |
+| FR-121 | Each webhook shall have an auto-generated HMAC-SHA256 signing secret (`secrets.token_hex(32)`) |
+| FR-122 | The system shall POST signed payloads (`X-Webhook-Signature: sha256=...`) to registered URLs on defined events |
+| FR-123 | Delivery attempts shall be logged in `webhook_deliveries` and viewable via `/api/webhooks/{id}/deliveries` |
+| FR-124 | Delivery jobs shall be processed by ARQ with retry; inline fallback for no-Redis deployments |
+| FR-125 | The internal event bus shall fan out to all active webhooks subscribed to `user.registered` and `user.login` |
+
+### 3.12 Internal Event Bus
+
+| ID | Requirement |
+|---|---|
+| FR-130 | The system shall provide a lightweight synchronous pub/sub event bus (`app/events.py`) |
+| FR-131 | `on(event, handler)` registers a handler; `emit(event, **data)` calls all registered handlers |
+| FR-132 | Exceptions in handlers shall be swallowed — they must never crash the caller |
+| FR-133 | Events emitted by the platform: `user.registered` (on register), `user.login` (on successful login) |
 
 ---
 
@@ -458,6 +498,47 @@ roles ──── (1:N) ──── users ──── (1:N) ──── user
 | `value` | TEXT | |
 | `created_at` / `updated_at` | TIMESTAMP | |
 
+#### `feature_flags`
+| Column | Type | Notes |
+|---|---|---|
+| `id` | SERIAL PK | |
+| `name` | VARCHAR(100) UNIQUE NOT NULL | Flag identifier |
+| `enabled` | BOOLEAN NOT NULL DEFAULT true | |
+| `description` | TEXT | |
+| `created_at` / `updated_at` | TIMESTAMP | |
+
+#### `notifications`
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `user_id` | INTEGER FK → users.id CASCADE | |
+| `message` | TEXT NOT NULL | |
+| `is_read` | BOOLEAN NOT NULL DEFAULT false | |
+| `created_at` | TIMESTAMP NOT NULL | |
+
+#### `webhooks`
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `user_id` | INTEGER FK → users.id CASCADE | |
+| `url` | TEXT NOT NULL | Target URL for POST delivery |
+| `secret` | VARCHAR(64) NOT NULL | HMAC-SHA256 signing secret |
+| `events` | JSONB NOT NULL DEFAULT `[]` | Array of subscribed event names |
+| `is_active` | BOOLEAN NOT NULL DEFAULT true | |
+| `created_at` | TIMESTAMP NOT NULL | |
+
+#### `webhook_deliveries`
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `webhook_id` | UUID FK → webhooks.id CASCADE | |
+| `event` | VARCHAR(100) NOT NULL | Event name that triggered the delivery |
+| `payload` | JSONB NOT NULL | Delivered payload |
+| `status_code` | INTEGER | HTTP response status code |
+| `success` | BOOLEAN NOT NULL DEFAULT false | |
+| `error` | TEXT | Error message if delivery failed |
+| `attempted_at` | TIMESTAMP NOT NULL | |
+
 ---
 
 ## 7. API Specification
@@ -517,7 +598,52 @@ roles ──── (1:N) ──── users ──── (1:N) ──── user
 | POST | `/invitations` | `invitations:manage` | Create an invitation |
 | DELETE | `/invitations/{id}` | `invitations:manage` | Delete an unused invitation |
 
-### 7.3 Response Formats
+### 7.3 Feature Flag Endpoints
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/api/feature-flags/{name}` | Public | Get a single feature flag value |
+| GET | `/api/admin/feature-flags` | Admin / `feature_flags:manage` | List all feature flags |
+| POST | `/api/admin/feature-flags` | Admin | Create a feature flag |
+| PUT | `/api/admin/feature-flags/{name}` | Admin | Update a feature flag |
+| DELETE | `/api/admin/feature-flags/{name}` | Admin | Delete a non-seeded flag |
+
+### 7.4 Notification Endpoints
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/api/notifications` | Bearer | List all notifications for the current user |
+| GET | `/api/notifications/unread-count` | Bearer | Return count of unread notifications |
+| PATCH | `/api/notifications/{id}/read` | Bearer | Mark a single notification as read |
+| POST | `/api/notifications/mark-all-read` | Bearer | Mark all notifications as read |
+| DELETE | `/api/notifications/{id}` | Bearer | Delete a notification |
+
+### 7.5 Webhook Endpoints
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/api/webhooks` | Bearer | List own webhooks |
+| POST | `/api/webhooks` | Bearer | Register a new webhook |
+| PUT | `/api/webhooks/{id}` | Bearer | Update a webhook |
+| DELETE | `/api/webhooks/{id}` | Bearer | Delete a webhook |
+| GET | `/api/webhooks/{id}/deliveries` | Bearer | View delivery history |
+
+### 7.6 WebSocket Endpoints
+
+| Path | Auth | Description |
+|---|---|---|
+| `WS /ws/admin/stats?token=<jwt>` | Admin JWT | Live system stats pushed every 5 s |
+| `WS /ws/notifications?token=<jwt>` | User JWT | Real-time notification push channel |
+
+### 7.7 Observability Endpoints
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/health` | Public | Liveness probe: `{"status": "healthy"}` |
+| GET | `/health/detailed` | Public | Readiness probe: DB, Redis, ARQ status; HTTP 503 on DB failure |
+| GET | `/metrics` | Public | Prometheus text-format metrics (when `PROMETHEUS_ENABLED=true`) |
+
+### 7.9 Response Formats
 
 All endpoints return `application/json`. Error responses follow the structure:
 ```json
@@ -628,6 +754,8 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 |---|---|---|---|
 | `webapp-db` | `postgres:18-alpine` | 5432 (internal) | Database |
 | `webapp-web` | Built from `Dockerfile` | 8080 → 8000 | Application |
+| `webapp-redis` | `redis:7-alpine` | 6379 (internal) | Cache / task queue |
+| `webapp-worker` | Built from `Dockerfile` | — | ARQ background worker |
 
 ### 9.2 Docker Compose (Production)
 
@@ -640,6 +768,8 @@ docker compose --profile proxy up -d
 | `webapp-db` | `postgres:18-alpine` | 5432 (internal) | Database |
 | `webapp-web` | Built from `Dockerfile` | 8000 (internal) | Application |
 | `webapp-caddy` | `caddy:2-alpine` | 80, 443 | TLS reverse proxy |
+| `webapp-redis` | `redis:7-alpine` | 6379 (internal) | Cache / task queue |
+| `webapp-worker` | Built from `Dockerfile` | — | ARQ background worker |
 
 ### 9.3 Dockerfile Requirements
 
@@ -684,6 +814,16 @@ docker compose --profile proxy up -d
 | `pyotp` | 2.9.0 | TOTP generation/verification |
 | `qrcode[pil]` | 8.2 | TOTP QR code generation |
 | `Pillow` | 12.1.1 | Avatar image processing |
+| `redis[asyncio]` | 5.3.0 | Redis async client |
+| `arq` | 0.26.1 | Async background task queue |
+| `python-json-logger` | 2.0.7 | Structured JSON logging |
+| `prometheus-client` | 0.21.1 | Prometheus metrics exposition |
+| `opentelemetry-api` | 1.30.0 | OpenTelemetry API |
+| `opentelemetry-sdk` | 1.30.0 | OpenTelemetry SDK |
+| `opentelemetry-instrumentation-fastapi` | 0.51b0 | FastAPI auto-instrumentation |
+| `opentelemetry-instrumentation-sqlalchemy` | 0.51b0 | SQLAlchemy auto-instrumentation |
+| `opentelemetry-exporter-otlp-proto-http` | 1.30.0 | OTLP HTTP trace exporter |
+| `sentry-sdk[fastapi]` | 2.24.1 | Sentry error and performance monitoring |
 
 ### 9.6 Kubernetes
 
@@ -719,6 +859,31 @@ docker compose --profile proxy up -d
 | `REQUIRE_JTI` | `false` | `true` = strict session tracking via JTI in DB |
 | `FORCE_EMAIL_VERIFICATION` | `false` | `true` = block unverified users on every request |
 | `INVITE_ONLY` | `false` | `true` = registration requires a valid invitation token |
+
+### 10.3b Redis & Background Tasks
+
+| Variable | Default | Description |
+|---|---|---|
+| `REDIS_URL` | *(unset)* | Redis connection URL; caching and ARQ disabled if unset |
+| `DATABASE_REPLICA_URL` | *(unset)* | Read replica connection string; falls back to primary if unset |
+| `DB_POOL_SIZE` | `5` | asyncpg connection pool size |
+| `DB_MAX_OVERFLOW` | `10` | Maximum pool overflow connections |
+| `DB_POOL_TIMEOUT` | `30` | Pool checkout timeout in seconds |
+| `DB_POOL_RECYCLE` | `1800` | Connection recycle interval in seconds |
+| `DB_ECHO` | `false` | Log all SQL statements |
+
+### 10.3c Observability
+
+| Variable | Default | Description |
+|---|---|---|
+| `LOG_LEVEL` | `INFO` | Root log level |
+| `LOG_FORMAT` | `json` | `json` for structured output, `text` for human-readable |
+| `PROMETHEUS_ENABLED` | `true` | Expose `/metrics` endpoint |
+| `OTEL_ENABLED` | `false` | Enable OpenTelemetry tracing |
+| `OTEL_ENDPOINT` | *(unset)* | OTLP HTTP exporter endpoint |
+| `OTEL_SERVICE_NAME` | `web-platform` | Service name in traces |
+| `SENTRY_DSN` | *(unset)* | Sentry DSN |
+| `AUTO_MIGRATE` | `false` | Run pending SQL migrations on startup |
 
 ### 10.4 Security
 
@@ -804,5 +969,5 @@ docker compose --profile proxy up -d
 
 ---
 
-*Document prepared from source code analysis of Web Platform Template v1.2.0.*
-*Last reviewed: 2026-02-24*
+*Document prepared from source code analysis of Web App Template v1.6.0.*
+*Last reviewed: 2026-03-05*

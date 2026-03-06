@@ -1,6 +1,6 @@
 # Kubernetes Deployment Guide
 
-This directory contains Kubernetes manifests for deploying the Web Platformlication to a Kubernetes cluster.
+This directory contains Kubernetes manifests for deploying the Web App to a Kubernetes cluster.
 
 ## Architecture Overview
 

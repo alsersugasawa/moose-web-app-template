@@ -1,6 +1,6 @@
 # Documentation
 
-Welcome to the Web Platform documentation!
+Welcome to the Web App documentation!
 
 ## User Documentation
 

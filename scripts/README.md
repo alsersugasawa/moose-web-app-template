@@ -1,6 +1,6 @@
 # Deployment Scripts
 
-This directory contains deployment and utility scripts for the Web Platform.
+This directory contains deployment and utility scripts for the Web App.
 
 ## Available Scripts
 
@@ -18,7 +18,7 @@ Automated deployment script for minikube (local Kubernetes testing).
 2. Configures Docker to use minikube's Docker daemon
 3. Builds the application Docker image locally
 4. Deploys PostgreSQL database
-5. Deploys the Web Platform application
+5. Deploys the Web App application
 6. Waits for all pods to be ready
 
 **Requirements:**
