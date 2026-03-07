@@ -1,0 +1,60 @@
+{
+  "skip_to_content": "Saltar al contenido principal",
+
+  "login": "Iniciar sesión",
+  "login_to_admin": "Acceder al Portal de Administración",
+  "register": "Registrarse",
+  "username": "Usuario",
+  "password": "Contraseña",
+  "email": "Correo electrónico",
+  "logout": "Cerrar sesión",
+  "close": "Cerrar",
+
+  "forgot_password": "¿Olvidaste tu contraseña?",
+  "dont_have_account": "¿No tienes cuenta?",
+  "register_here": "Regístrate aquí",
+  "already_have_account": "¿Ya tienes cuenta?",
+  "login_here": "Inicia sesión aquí",
+  "back_to_login": "Volver al inicio de sesión",
+  "send_reset_link": "Enviar enlace de recuperación",
+  "reset_password": "Restablecer contraseña",
+
+  "two_factor_auth": "Autenticación de dos factores",
+  "totp_instructions": "Ingresa el código de 6 dígitos de tu aplicación autenticadora.",
+  "verify": "Verificar",
+
+  "forgot_password_title": "Olvidé mi contraseña",
+  "forgot_password_instructions": "Ingresa tu correo y te enviaremos un enlace de recuperación.",
+
+  "welcome": "Bienvenido a tu panel",
+  "welcome_subtitle": "Esta es una plantilla genérica de plataforma web. Reemplaza este contenido con las funciones de tu aplicación.",
+
+  "account_security": "Seguridad de la cuenta",
+  "two_factor_authentication": "Autenticación de dos factores (TOTP)",
+  "not_set_up": "No configurado",
+  "set_up_2fa": "Configurar 2FA",
+  "disable_2fa": "Desactivar 2FA",
+  "active_sessions": "Sesiones activas",
+  "api_keys": "Claves API",
+  "new_key": "Nueva clave",
+
+  "my_profile": "Mi perfil",
+  "change_avatar": "Cambiar avatar",
+  "display_name": "Nombre para mostrar",
+  "bio": "Biografía",
+  "timezone": "Zona horaria",
+  "language": "Idioma",
+  "save_profile": "Guardar perfil",
+
+  "dashboard": "Panel",
+  "users": "Usuarios",
+  "logs": "Registros",
+  "backups": "Copias de seguridad",
+  "certificates": "Certificados",
+  "invitations": "Invitaciones",
+  "feature_flags": "Indicadores de funciones",
+  "files": "Archivos",
+  "developer_tools": "Herramientas para desarrolladores",
+  "my_account": "Mi cuenta",
+  "about": "Acerca de"
+}

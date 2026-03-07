@@ -112,6 +112,15 @@ class Settings(BaseSettings):
     # ── Phase 5: Automated migration runner ───────────────────────────────────
     auto_migrate: bool = False          # apply pending .sql files on startup
 
+    # ── Phase 7: S3-compatible file storage ───────────────────────────────────
+    # Leave storage_bucket blank to disable file storage
+    storage_bucket: str = ""
+    storage_access_key: str = ""
+    storage_secret_key: str = ""
+    storage_region: str = ""           # e.g. us-east-1 (empty = default)
+    storage_endpoint_url: str = ""     # custom endpoint for MinIO / Cloudflare R2
+    storage_presign_expiry: int = 3600 # presigned URL lifetime in seconds
+
     model_config = SettingsConfigDict(
         # Base file first; profile file overlays on top
         env_file=[".env", f".env.{APP_ENV}"],

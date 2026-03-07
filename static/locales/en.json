@@ -1,0 +1,60 @@
+{
+  "skip_to_content": "Skip to main content",
+
+  "login": "Login",
+  "login_to_admin": "Login to Admin Portal",
+  "register": "Register",
+  "username": "Username",
+  "password": "Password",
+  "email": "Email",
+  "logout": "Logout",
+  "close": "Close",
+
+  "forgot_password": "Forgot password?",
+  "dont_have_account": "Don't have an account?",
+  "register_here": "Register here",
+  "already_have_account": "Already have an account?",
+  "login_here": "Login here",
+  "back_to_login": "Back to login",
+  "send_reset_link": "Send Reset Link",
+  "reset_password": "Reset Password",
+
+  "two_factor_auth": "Two-Factor Authentication",
+  "totp_instructions": "Enter the 6-digit code from your authenticator app.",
+  "verify": "Verify",
+
+  "forgot_password_title": "Forgot Password",
+  "forgot_password_instructions": "Enter your email and we'll send a reset link.",
+
+  "welcome": "Welcome to your dashboard",
+  "welcome_subtitle": "This is a generic web platform template. Replace this content with your application's features.",
+
+  "account_security": "Account Security",
+  "two_factor_authentication": "Two-Factor Authentication (TOTP)",
+  "not_set_up": "Not set up",
+  "set_up_2fa": "Set up 2FA",
+  "disable_2fa": "Disable 2FA",
+  "active_sessions": "Active Sessions",
+  "api_keys": "API Keys",
+  "new_key": "New Key",
+
+  "my_profile": "My Profile",
+  "change_avatar": "Change Avatar",
+  "display_name": "Display Name",
+  "bio": "Bio",
+  "timezone": "Timezone",
+  "language": "Language",
+  "save_profile": "Save Profile",
+
+  "dashboard": "Dashboard",
+  "users": "Users",
+  "logs": "Logs",
+  "backups": "Backups",
+  "certificates": "Certificates",
+  "invitations": "Invitations",
+  "feature_flags": "Feature Flags",
+  "files": "Files",
+  "developer_tools": "Developer Tools",
+  "my_account": "My Account",
+  "about": "About"
+}

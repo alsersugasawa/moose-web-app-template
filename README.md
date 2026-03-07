@@ -1,6 +1,6 @@
-# Web App Template v1.6.0
+# Web App Template v1.8.0
 
-A full-stack web application template with authentication, role-based access control, admin portal, real-time features, background jobs, observability, and production-ready infrastructure.
+A full-stack web application template with authentication, role-based access control, admin portal, real-time features, background jobs, observability, file storage, and production-ready infrastructure.
 
 ## Features
 
@@ -56,6 +56,17 @@ A full-stack web application template with authentication, role-based access con
 - **Webhook Delivery** — Register URLs to receive HMAC-SHA256 signed POST payloads on defined events; delivery history and ARQ retry
 - **Transactional Email** — Welcome email sent automatically on registration via ARQ task
 
+### File Storage
+- **S3-Compatible Storage** — Upload files to AWS S3, MinIO, or Cloudflare R2; presigned URL generation for direct downloads; configurable via `STORAGE_BUCKET` and related env vars
+- **Image Processing** — Automatic 256×256 JPEG thumbnail generation on upload for images (JPEG, PNG, GIF, WebP) via Pillow
+- **File Management UI** — Admin portal "Files" section with thumbnail previews, file stats, download, and delete actions
+
+### Frontend & UX
+- **React / Vite SPA** — Opt-in single-page app in `frontend/` with React 18, React Router v6, and a typed API client; dev-server proxies to FastAPI; builds to `static/spa/`
+- **Internationalization (i18n)** — `static/i18n.js` locale engine with `data-i18n` DOM attributes; English, Spanish, and French locale files shared between the static pages and the SPA (react-i18next); language switcher in user profile and SPA login/dashboard
+- **Accessibility (WCAG 2.1 AA)** — Skip navigation links, ARIA landmarks, `aria-live` error/status regions, `aria-required`, `autocomplete` attributes across all pages
+- **Progressive Web App (PWA)** — Web app manifest with shortcuts; service worker with cache-first (static) + network-first (API) strategies; installable and offline-capable
+
 ### Security & Infrastructure
 - **Rate Limiting** — Configurable per-IP request rate limits
 - **Security Headers** — HSTS, CSP, X-Frame-Options, and more (OWASP ASVS 14.4)
@@ -67,9 +78,11 @@ A full-stack web application template with authentication, role-based access con
 ## Tech Stack
 
 - **Backend**: FastAPI, SQLAlchemy 2.0 (async), PostgreSQL 18, uvicorn
-- **Frontend**: HTML, CSS, JavaScript, Bootstrap 5.3
-- **Authentication**: JWT (python-jose), bcrypt (passlib), TOTP (pyotp), OAuth 2.0 (authlib)
-- **Image Processing**: Pillow (avatar resize)
+- **Frontend (static)**: HTML, CSS, JavaScript, Bootstrap 5.3
+- **Frontend (SPA)**: React 18, React Router v6, Vite 6, react-i18next
+- **Authentication**: JWT (python-jose), bcrypt, TOTP (pyotp), OAuth 2.0 (authlib)
+- **Image Processing**: Pillow (avatar resize + file thumbnails)
+- **File Storage**: boto3 (S3 / MinIO / Cloudflare R2)
 - **Email**: aiosmtplib (async SMTP)
 - **Caching / Queue**: Redis, ARQ (background tasks)
 - **Real-time**: WebSockets (built-in FastAPI)
@@ -198,6 +211,7 @@ Or use the Minikube helper script:
    psql webapp < migrations/004_phase2.sql
    psql webapp < migrations/005_phase3.sql
    psql webapp < migrations/006_phase6.sql
+   psql webapp < migrations/007_phase7.sql
    ```
 
 4. **Start the server**
@@ -273,22 +287,34 @@ Or use the Minikube helper script:
 | `SENTRY_DSN` | *(unset)* | Sentry DSN for error and performance monitoring |
 | `AUTO_MIGRATE` | `false` | Run pending SQL migrations automatically on startup |
 
+### File Storage (S3-compatible)
+
+| Variable | Default | Description |
+|---|---|---|
+| `STORAGE_BUCKET` | *(unset)* | S3 bucket name; file storage disabled when empty |
+| `STORAGE_ACCESS_KEY` | *(unset)* | S3 / MinIO / R2 access key |
+| `STORAGE_SECRET_KEY` | *(unset)* | S3 / MinIO / R2 secret key |
+| `STORAGE_REGION` | *(unset)* | AWS region (e.g. `us-east-1`); optional for MinIO/R2 |
+| `STORAGE_ENDPOINT_URL` | *(unset)* | Custom endpoint URL for MinIO or Cloudflare R2 |
+| `STORAGE_PRESIGN_EXPIRY` | `3600` | Presigned URL lifetime in seconds |
+
 ## Project Structure
 
 ```
 .
 ├── app/
 │   ├── main.py              # FastAPI application entry point and lifespan
-│   ├── models.py            # SQLAlchemy ORM models (User, Role, ApiKey, Notification, Webhook, …)
+│   ├── models.py            # SQLAlchemy ORM models (User, Role, ApiKey, Notification, Webhook, StoredFile, …)
 │   ├── schemas.py           # Pydantic request/response schemas
 │   ├── auth.py              # JWT + API key authentication and session logic
 │   ├── permissions.py       # require_permission(scope) dependency factory
 │   ├── database.py          # Async database connection and read replica routing
-│   ├── config.py            # App configuration
+│   ├── config.py            # Backup configuration
 │   ├── settings.py          # Pydantic-settings config with env profile support
 │   ├── email.py             # Async SMTP helpers (verification, password reset)
 │   ├── security.py          # Rate limiting and security header middleware
 │   ├── cache.py             # Redis caching helpers
+│   ├── storage.py           # S3-compatible file storage (boto3 + Pillow thumbnails)
 │   ├── worker.py            # ARQ worker settings
 │   ├── tasks.py             # Background task definitions
 │   ├── ws_manager.py        # WebSocket connection manager
@@ -306,22 +332,44 @@ Or use the Minikube helper script:
 │       ├── websocket.py     # WebSocket endpoints (admin stats, notifications)
 │       ├── notifications.py # Notification REST API (/api/notifications)
 │       ├── webhooks.py      # Webhook CRUD and delivery history (/api/webhooks)
+│       ├── files.py         # File upload/download/delete (/api/files, /api/admin/files)
 │       └── health.py        # Health check endpoints (/health, /health/detailed)
 ├── static/
-│   ├── index.html           # Main application page
-│   ├── app.js               # Frontend application logic
+│   ├── index.html           # Main application page (PWA, i18n, ARIA)
+│   ├── app.js               # Frontend application logic (i18n-aware)
 │   ├── styles.css           # Main styles
 │   ├── setup.html           # First-run setup wizard
-│   ├── admin.html           # Admin portal page
-│   ├── admin.js             # Admin portal logic
-│   └── admin-styles.css     # Admin styles
+│   ├── admin.html           # Admin portal page (PWA, i18n, ARIA)
+│   ├── admin.js             # Admin portal logic (file management)
+│   ├── admin-styles.css     # Admin styles
+│   ├── i18n.js              # Lightweight i18n engine
+│   ├── manifest.json        # PWA web app manifest
+│   ├── service-worker.js    # PWA service worker (cache-first + network-first)
+│   └── locales/
+│       ├── en.json          # English translations
+│       ├── es.json          # Spanish translations
+│       └── fr.json          # French translations
+├── frontend/                # Opt-in React/Vite SPA starter
+│   ├── package.json         # React 18, Vite 6, react-i18next, react-router-dom
+│   ├── vite.config.js       # Dev proxy to FastAPI; build output to static/spa/
+│   ├── index.html
+│   └── src/
+│       ├── main.jsx         # React root + SW registration
+│       ├── App.jsx          # Auth context, protected routes
+│       ├── i18n.js          # react-i18next config (shares locale files)
+│       ├── api/
+│       │   └── client.js    # Typed fetch wrappers for all REST endpoints
+│       └── pages/
+│           ├── LoginPage.jsx    # Login / register / forgot-password
+│           └── DashboardPage.jsx # Overview, notifications, file management
 ├── migrations/
 │   ├── 001_add_admin_features.sql
 │   ├── 002_add_app_config.sql
 │   ├── 003_phase1.sql       # Email verification, OAuth, TOTP, sessions
 │   ├── 004_phase2.sql       # Roles, API keys, invitations, user profile columns
 │   ├── 005_phase3.sql       # Feature flags
-│   └── 006_phase6.sql       # Notifications, webhooks, webhook_deliveries
+│   ├── 006_phase6.sql       # Notifications, webhooks, webhook_deliveries
+│   └── 007_phase7.sql       # stored_files table
 ├── plugins/
 │   └── example/             # Reference plugin with GET /api/plugins/example/ping
 ├── docs/
@@ -346,11 +394,21 @@ Or use the Minikube helper script:
 
 1. **Add data models** in `app/models.py`
 2. **Add API routes** under `app/routers/` (or use `python -m scaffold router <name>`)
-3. **Update the frontend** in `static/index.html` and `static/app.js`
+3. **Update the frontend** in `static/index.html` and `static/app.js`, or build on the React SPA in `frontend/`
 4. **Add database migrations** in `migrations/`
 5. **Define permission scopes** in `app/permissions.py` and protect endpoints with `require_permission("scope:action")`
 6. **Customize the dashboard** — use the built-in Customize panel to add cards without touching code
 7. **Add plugins** — drop a Python package with a `router` attribute into `plugins/` for auto-registration
+8. **Add translations** — drop a new `static/locales/<locale>.json` file; register the locale in `static/i18n.js` and `frontend/src/i18n.js`
+
+### Running the React SPA
+
+```bash
+cd frontend
+npm install
+npm run dev     # http://localhost:5173 — proxies /api and /ws to localhost:8080
+npm run build   # produces static/spa/ for serving by FastAPI
+```
 
 ## Documentation
 

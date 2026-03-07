@@ -4,87 +4,113 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="version" content="1.0.0">
+    <meta name="description" content="Web Platform — your application dashboard">
+    <meta name="theme-color" content="#667eea">
     <title>Web Platform</title>
+    <!-- PWA manifest -->
+    <link rel="manifest" href="/static/manifest.json">
     <!-- Bootstrap 5.3 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.css">
     <!-- Custom CSS -->
     <link rel="stylesheet" href="/static/styles.css">
+    <!-- i18n -->
+    <script src="/static/i18n.js"></script>
+    <style>
+        /* WCAG 2.4.1 — skip navigation link */
+        .skip-link {
+            position: absolute;
+            top: -100%;
+            left: 0;
+            z-index: 9999;
+            padding: 8px 16px;
+            background: #667eea;
+            color: #fff;
+            font-weight: 600;
+            text-decoration: none;
+            border-radius: 0 0 4px 0;
+            transition: top 0.1s;
+        }
+        .skip-link:focus { top: 0; }
+    </style>
 </head>
 <body class="bg-light">
 
+    <!-- Skip navigation (WCAG 2.4.1) -->
+    <a href="#main-content" class="skip-link" data-i18n="skip_to_content">Skip to main content</a>
+
     <!-- Authentication Section -->
-    <div id="auth-container" class="auth-container">
+    <div id="auth-container" class="auth-container" role="main" aria-label="Authentication">
         <div class="auth-box">
             <h1 id="app-title">Web Platform</h1>
 
             <!-- Login Form -->
-            <div id="login-form" class="auth-form">
-                <h2>Login</h2>
-                <form onsubmit="handleLogin(event)">
-                    <input type="text" id="login-username" placeholder="Username" required>
-                    <input type="password" id="login-password" placeholder="Password" required>
-                    <button type="submit">Login</button>
+            <div id="login-form" class="auth-form" role="region" aria-labelledby="login-heading">
+                <h2 id="login-heading" data-i18n="login">Login</h2>
+                <form onsubmit="handleLogin(event)" novalidate>
+                    <input type="text" id="login-username" placeholder="Username" data-i18n-placeholder="username" required aria-label="Username" aria-required="true" autocomplete="username">
+                    <input type="password" id="login-password" placeholder="Password" data-i18n-placeholder="password" required aria-label="Password" aria-required="true" autocomplete="current-password">
+                    <button type="submit" data-i18n="login">Login</button>
                 </form>
                 <div id="oauth-buttons" class="mt-2"></div>
-                <p class="mt-2">Don't have an account? <a href="#" onclick="showRegister()">Register here</a></p>
-                <p><a href="#" onclick="showForgotPassword()" class="text-muted small">Forgot password?</a></p>
-                <div id="login-error" class="error-message"></div>
+                <p class="mt-2">Don't have an account? <a href="#" onclick="showRegister()" data-i18n="register_here">Register here</a></p>
+                <p><a href="#" onclick="showForgotPassword()" class="text-muted small" data-i18n="forgot_password">Forgot password?</a></p>
+                <div id="login-error" class="error-message" role="alert" aria-live="assertive"></div>
             </div>
 
             <!-- Register Form -->
-            <div id="register-form" class="auth-form" style="display: none;">
-                <h2>Register</h2>
-                <form onsubmit="handleRegister(event)">
-                    <input type="text" id="register-username" placeholder="Username" required>
-                    <input type="email" id="register-email" placeholder="Email" required>
-                    <input type="password" id="register-password" placeholder="Password" required>
+            <div id="register-form" class="auth-form" style="display: none;" role="region" aria-labelledby="register-heading">
+                <h2 id="register-heading" data-i18n="register">Register</h2>
+                <form onsubmit="handleRegister(event)" novalidate>
+                    <input type="text" id="register-username" placeholder="Username" data-i18n-placeholder="username" required aria-label="Username" aria-required="true" autocomplete="username">
+                    <input type="email" id="register-email" placeholder="Email" data-i18n-placeholder="email" required aria-label="Email" aria-required="true" autocomplete="email">
+                    <input type="password" id="register-password" placeholder="Password" data-i18n-placeholder="password" required aria-label="Password" aria-required="true" autocomplete="new-password">
                     <div id="invite-token-row" style="display:none;">
-                        <input type="text" id="register-invite-token" placeholder="Invitation code (required)">
+                        <input type="text" id="register-invite-token" placeholder="Invitation code (required)" aria-label="Invitation code">
                     </div>
-                    <button type="submit">Register</button>
+                    <button type="submit" data-i18n="register">Register</button>
                 </form>
-                <p>Already have an account? <a href="#" onclick="showLogin()">Login here</a></p>
-                <div id="register-error" class="error-message"></div>
+                <p>Already have an account? <a href="#" onclick="showLogin()" data-i18n="login_here">Login here</a></p>
+                <div id="register-error" class="error-message" role="alert" aria-live="assertive"></div>
             </div>
 
             <!-- TOTP Verification Step -->
-            <div id="totp-form" class="auth-form" style="display: none;">
-                <h2>Two-Factor Authentication</h2>
-                <p class="text-muted small">Enter the 6-digit code from your authenticator app.</p>
+            <div id="totp-form" class="auth-form" style="display: none;" role="region" aria-labelledby="totp-heading">
+                <h2 id="totp-heading" data-i18n="two_factor_auth">Two-Factor Authentication</h2>
+                <p class="text-muted small" data-i18n="totp_instructions">Enter the 6-digit code from your authenticator app.</p>
                 <form onsubmit="handleTotpVerify(event)">
-                    <input type="text" id="totp-code" placeholder="000000" maxlength="6" inputmode="numeric" pattern="[0-9]{6}" required autocomplete="one-time-code">
-                    <button type="submit">Verify</button>
+                    <input type="text" id="totp-code" placeholder="000000" maxlength="6" inputmode="numeric" pattern="[0-9]{6}" required autocomplete="one-time-code" aria-label="One-time code" aria-required="true">
+                    <button type="submit" data-i18n="verify">Verify</button>
                 </form>
-                <p><a href="#" onclick="showLogin()" class="text-muted small">Back to login</a></p>
-                <div id="totp-error" class="error-message"></div>
+                <p><a href="#" onclick="showLogin()" class="text-muted small" data-i18n="back_to_login">Back to login</a></p>
+                <div id="totp-error" class="error-message" role="alert" aria-live="assertive"></div>
             </div>
 
             <!-- Forgot Password Form -->
-            <div id="forgot-password-form" class="auth-form" style="display: none;">
-                <h2>Forgot Password</h2>
-                <p class="text-muted small">Enter your email and we'll send a reset link.</p>
-                <form onsubmit="handleForgotPassword(event)">
-                    <input type="email" id="forgot-email" placeholder="Email address" required>
-                    <button type="submit">Send Reset Link</button>
+            <div id="forgot-password-form" class="auth-form" style="display: none;" role="region" aria-labelledby="forgot-heading">
+                <h2 id="forgot-heading" data-i18n="forgot_password_title">Forgot Password</h2>
+                <p class="text-muted small" data-i18n="forgot_password_instructions">Enter your email and we'll send a reset link.</p>
+                <form onsubmit="handleForgotPassword(event)" novalidate>
+                    <input type="email" id="forgot-email" placeholder="Email address" data-i18n-placeholder="email" required aria-label="Email address" aria-required="true" autocomplete="email">
+                    <button type="submit" data-i18n="send_reset_link">Send Reset Link</button>
                 </form>
-                <p><a href="#" onclick="showLogin()" class="text-muted small">Back to login</a></p>
-                <div id="forgot-error" class="error-message"></div>
-                <div id="forgot-success" class="text-success small mt-2" style="display:none;"></div>
+                <p><a href="#" onclick="showLogin()" class="text-muted small" data-i18n="back_to_login">Back to login</a></p>
+                <div id="forgot-error" class="error-message" role="alert" aria-live="assertive"></div>
+                <div id="forgot-success" class="text-success small mt-2" role="status" aria-live="polite" style="display:none;"></div>
             </div>
 
             <!-- Reset Password Form (shown when ?reset_token= is in URL) -->
-            <div id="reset-password-form" class="auth-form" style="display: none;">
-                <h2>Reset Password</h2>
-                <form onsubmit="handleResetPassword(event)">
-                    <input type="password" id="reset-new-password" placeholder="New password" required>
-                    <input type="password" id="reset-confirm-password" placeholder="Confirm new password" required>
-                    <button type="submit">Reset Password</button>
+            <div id="reset-password-form" class="auth-form" style="display: none;" role="region" aria-labelledby="reset-heading">
+                <h2 id="reset-heading" data-i18n="reset_password">Reset Password</h2>
+                <form onsubmit="handleResetPassword(event)" novalidate>
+                    <input type="password" id="reset-new-password" placeholder="New password" required aria-label="New password" aria-required="true" autocomplete="new-password">
+                    <input type="password" id="reset-confirm-password" placeholder="Confirm new password" required aria-label="Confirm new password" aria-required="true" autocomplete="new-password">
+                    <button type="submit" data-i18n="reset_password">Reset Password</button>
                 </form>
-                <p><a href="#" onclick="showLogin()" class="text-muted small">Back to login</a></p>
-                <div id="reset-error" class="error-message"></div>
-                <div id="reset-success" class="text-success small mt-2" style="display:none;"></div>
+                <p><a href="#" onclick="showLogin()" class="text-muted small" data-i18n="back_to_login">Back to login</a></p>
+                <div id="reset-error" class="error-message" role="alert" aria-live="assertive"></div>
+                <div id="reset-success" class="text-success small mt-2" role="status" aria-live="polite" style="display:none;"></div>
             </div>
         </div>
     </div>
@@ -92,7 +118,7 @@
     <!-- Main Application -->
     <div id="app-container" class="app-container" style="display: none;">
         <!-- Header -->
-        <header class="app-header">
+        <header class="app-header" role="banner">
             <div class="header-left">
                 <h1 id="header-app-title">Web Platform</h1>
             </div>
@@ -181,7 +207,7 @@
         </div>
 
         <!-- Dashboard Content -->
-        <main class="container-fluid py-4">
+        <main id="main-content" class="container-fluid py-4" role="main">
             <div class="row g-3" id="dashboard-cards-row">
                 <!-- Dashboard toolbar -->
                 <div class="col-12 d-flex justify-content-end">
@@ -455,5 +481,13 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
     <!-- App JS -->
     <script src="/static/app.js"></script>
+    <!-- Phase 8: PWA service worker registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/static/service-worker.js').catch(() => {});
+            });
+        }
+    </script>
 </body>
 </html>

@@ -136,6 +136,9 @@ function showSection(sectionName) {
         case 'feature-flags':
             loadFeatureFlags();
             break;
+        case 'files':
+            loadAdminFiles();
+            break;
         case 'developer-tools':
             // Static section — nothing to load dynamically
             break;
@@ -1962,6 +1965,138 @@ async function deleteFeatureFlag(name) {
 function showCreateFlagForm() {
     document.getElementById('create-flag-form').style.display = 'block';
     document.getElementById('flag-name').focus();
+}
+
+// ── Phase 7: File Management ──────────────────────────────────────────────────
+
+function formatBytes(bytes) {
+    if (bytes === 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + units[i];
+}
+
+async function loadAdminFiles() {
+    const tbody = document.getElementById('files-table-body');
+    const warning = document.getElementById('files-storage-warning');
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center">Loading…</td></tr>';
+
+    try {
+        const response = await fetch(`${API_BASE}/api/admin/files`, {
+            headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+
+        if (response.status === 503) {
+            warning.style.display = 'block';
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Storage not configured</td></tr>';
+            return;
+        }
+        warning.style.display = 'none';
+
+        if (!response.ok) throw new Error('Failed to load files');
+
+        const files = await response.json();
+
+        // Update stats
+        const totalSize = files.reduce((sum, f) => sum + f.size_bytes, 0);
+        document.getElementById('files-stat-count').textContent = files.length;
+        document.getElementById('files-stat-size').textContent = formatBytes(totalSize);
+
+        if (files.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No files uploaded yet</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = files.map(f => `
+            <tr>
+                <td style="width:56px;">
+                    ${f.has_thumbnail
+                        ? `<img src="" data-file-id="${f.id}" class="file-thumb" style="width:48px;height:48px;object-fit:cover;border-radius:4px;cursor:pointer;" onclick="openFileUrl('${f.id}',true)" title="Click to download thumbnail">`
+                        : `<span style="font-size:24px;">${fileIcon(f.content_type)}</span>`}
+                </td>
+                <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(f.filename)}">${escHtml(f.filename)}</td>
+                <td><span class="badge bg-secondary" style="font-size:11px;">${escHtml(f.content_type || '—')}</span></td>
+                <td>${formatBytes(f.size_bytes)}</td>
+                <td>${new Date(f.created_at).toLocaleString()}</td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary me-1" onclick="openFileUrl('${f.id}',false)" title="Download">
+                        <i class="bi bi-download"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="adminDeleteFile('${f.id}','${escHtml(f.filename)}')" title="Delete">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+
+        // Lazy-load thumbnail presigned URLs
+        document.querySelectorAll('.file-thumb[data-file-id]').forEach(async (img) => {
+            try {
+                const res = await fetch(`${API_BASE}/api/admin/files/${img.dataset.fileId}/url?thumbnail=true`, {
+                    headers: { 'Authorization': `Bearer ${adminToken}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    img.src = data.url;
+                }
+            } catch (_) { /* ignore */ }
+        });
+
+    } catch (error) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">Error: ${escHtml(error.message)}</td></tr>`;
+    }
+}
+
+function fileIcon(contentType) {
+    if (!contentType) return '📄';
+    if (contentType.startsWith('image/')) return '🖼️';
+    if (contentType.startsWith('video/')) return '🎬';
+    if (contentType.startsWith('audio/')) return '🎵';
+    if (contentType.includes('pdf')) return '📕';
+    if (contentType.includes('zip') || contentType.includes('tar') || contentType.includes('gzip')) return '🗜️';
+    if (contentType.includes('spreadsheet') || contentType.includes('excel') || contentType.includes('csv')) return '📊';
+    if (contentType.includes('word') || contentType.includes('document')) return '📝';
+    return '📄';
+}
+
+function escHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function openFileUrl(fileId, thumbnail) {
+    try {
+        const res = await fetch(
+            `${API_BASE}/api/admin/files/${fileId}/url${thumbnail ? '?thumbnail=true' : ''}`,
+            { headers: { 'Authorization': `Bearer ${adminToken}` } }
+        );
+        if (!res.ok) throw new Error('Could not generate download URL');
+        const data = await res.json();
+        window.open(data.url, '_blank');
+    } catch (error) {
+        alert(`Error: ${error.message}`);
+    }
+}
+
+async function adminDeleteFile(fileId, filename) {
+    if (!confirm(`Delete "${filename}"? This cannot be undone.`)) return;
+    try {
+        const res = await fetch(`${API_BASE}/api/admin/files/${fileId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        if (res.status === 503) {
+            alert('File storage is not configured.');
+            return;
+        }
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || 'Delete failed');
+        }
+        loadAdminFiles();
+    } catch (error) {
+        alert(`Error: ${error.message}`);
+    }
 }
 
 function hideFlagForm() {

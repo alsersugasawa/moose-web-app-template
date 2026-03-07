@@ -2,6 +2,99 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.8.0] - 2026-03-05
+
+### Added — Phase 8: Frontend & UX
+
+#### Progressive Web App (`static/manifest.json`, `static/service-worker.js`)
+- Web App Manifest: `name`, `short_name`, `theme_color` (#667eea), `display: standalone`, icon slots, and two shortcuts (Dashboard, Admin)
+- Service worker with a **cache-first** strategy for `/static/*` assets and a **network-first** strategy for `/api/*` calls; offline fallback returns a structured JSON error for API requests
+- Service worker registered on every page (`index.html`, `admin.html`, `admin-login.html`, `setup.html`) via a non-blocking `load` event listener
+- `<link rel="manifest">` and `<meta name="theme-color">` added to all HTML pages
+
+#### Internationalization — `static/i18n.js` + locale files
+- Lightweight zero-dependency i18n module: locale detection from `localStorage` → `navigator.language` → `'en'` fallback
+- `I18n.init()` — loads locale JSON and applies translations before first render
+- `I18n.setLocale(locale)` — switches language at runtime, persists to `localStorage`, re-applies DOM translations
+- `I18n.t(key, fallback)` — programmatic key lookup
+- DOM-driven translation via `data-i18n`, `data-i18n-placeholder`, `data-i18n-aria-label`, and `data-i18n-title` attributes
+- Locale files for **English** (`en`), **Spanish** (`es`), and **French** (`fr`) at `static/locales/`; covers ~40 UI strings
+- `app.js`: `I18n.init()` called before any rendering; profile-save handler calls `I18n.setLocale()` when language changes
+- `admin.html`: nav links annotated with `data-i18n`; `I18n.init()` called on load
+
+#### Accessibility — WCAG 2.1 AA
+- **Skip navigation links** on every page (`<a class="skip-link" href="#main-content">`) — visible on keyboard focus (WCAG 2.4.1)
+- **ARIA landmarks**: `role="main"`, `role="banner"`, `role="navigation"` with `aria-label` on all pages
+- **`aria-live` regions**: every error message (`role="alert" aria-live="assertive"`) and success/status message (`role="status" aria-live="polite"`) in `index.html` and `admin-login.html`
+- **`aria-required="true"`** on all required form fields; `autocomplete` attributes set throughout auth forms
+- **`novalidate`** on forms where custom error UI is used; removes confusing browser-native bubbles
+- Admin portal nav: `role="navigation" aria-label="Admin portal navigation"` wraps the `<nav>`, menu items carry `role="menuitem"`; `admin-username` span has `aria-live="polite"`
+- Admin portal: `role="main"` wrapper div (`id="admin-main-content"`) enables skip-link target
+
+#### React / Vite SPA Starter (`frontend/`)
+- Opt-in React 18 + Vite 6 single-page app; proxies `/api` and `/ws` to the FastAPI backend in development
+- `vite.config.js`: dev server on `:5173`; production build outputs to `static/spa/`
+- **Auth context** (`App.jsx`): `AuthProvider` + `useAuth()` hook with `login()` / `logout()` helpers; `RequireAuth` wrapper for protected routes; token verified via `GET /api/auth/me` on mount
+- **API client** (`src/api/client.js`): typed `fetch` wrappers for auth, notifications, files, and API keys; automatic `Authorization: Bearer` header injection
+- **LoginPage** (`src/pages/LoginPage.jsx`): login / register / forgot-password tabs with field-level errors; language switcher; `i18n.changeLanguage()` on login using user's saved language preference
+- **DashboardPage** (`src/pages/DashboardPage.jsx`): overview stats, notifications tab (mark read / mark all read), files tab (upload, download via presigned URL, delete); language switcher in header
+- **i18n**: react-i18next with `i18next-http-backend`; loads from `/static/locales/` so the SPA shares translation files with the static pages; locale persisted to `localStorage`
+- `frontend/.env.example` documents `VITE_API_BASE`
+
+#### Infrastructure
+- `requirements.txt`: no new Python dependencies (Pillow already present; boto3 added in v1.7.0)
+
+---
+
+## [1.7.0] - 2026-03-05
+
+### Added — Phase 7: File Storage
+
+#### S3-Compatible Object Storage (`app/storage.py`)
+- `upload_file(key, data, content_type)` — uploads bytes to the configured S3 bucket
+- `delete_file(key)` — removes an object from the bucket
+- `generate_presigned_url(key, expires_in)` — returns a time-limited GET URL (default: `STORAGE_PRESIGN_EXPIRY` seconds, default 3600)
+- `make_thumbnail(data, max_size)` — generates a 256×256 JPEG thumbnail from image bytes using Pillow; returns `None` on non-image input
+- All S3 calls dispatched to the thread-pool executor via `asyncio.get_event_loop().run_in_executor()` — non-blocking async interface over the synchronous boto3 SDK
+- Supports **AWS S3**, **MinIO**, and **Cloudflare R2** via `STORAGE_ENDPOINT_URL`
+
+#### File REST API (`app/routers/files.py`)
+- **User endpoints** (`/api/files/*`, requires authenticated user):
+  - `POST /api/files/upload` — multipart upload; 50 MB ceiling; auto-generates a 256×256 JPEG thumbnail for image MIME types (JPEG, PNG, GIF, WebP, BMP, TIFF)
+  - `GET /api/files` — list caller's uploaded files
+  - `GET /api/files/{id}/url?thumbnail=false` — generate a presigned download URL (original or thumbnail)
+  - `DELETE /api/files/{id}` — delete object + thumbnail from S3 and DB record
+- **Admin endpoints** (`/api/admin/files/*`, requires admin):
+  - `GET /api/admin/files` — list all files across all users
+  - `GET /api/admin/files/{id}/url` — presigned URL for any file
+  - `DELETE /api/admin/files/{id}` — delete any file
+
+#### `StoredFile` Model (`app/models.py`)
+- UUID primary key, `user_id` FK (cascade delete), `filename`, `content_type`, `size_bytes`, `s3_key`, `thumbnail_key` (nullable), `created_at`
+
+#### Migration (`migrations/007_phase7.sql`)
+- `stored_files` table with UUID PK (`gen_random_uuid()`), FK to `users`, index on `user_id`
+
+#### Admin Portal — File Management UI (`static/admin.html`, `static/admin.js`)
+- New **"Files"** section in the admin navigation
+- Stats bar: total file count and aggregate size
+- Browsable table: inline 48×48 thumbnail previews (lazy-loaded via presigned URLs), filename, MIME type, size, upload timestamp
+- Per-row Download (opens presigned URL in new tab) and Delete (with confirmation) actions
+- Graceful "storage not configured" warning when `STORAGE_BUCKET` is unset
+
+#### Settings (`app/settings.py`)
+- `STORAGE_BUCKET` — bucket name; empty string disables file storage (returns HTTP 503)
+- `STORAGE_ACCESS_KEY` / `STORAGE_SECRET_KEY` — S3 credentials
+- `STORAGE_REGION` — e.g. `us-east-1` (empty = SDK default)
+- `STORAGE_ENDPOINT_URL` — custom endpoint for MinIO / Cloudflare R2
+- `STORAGE_PRESIGN_EXPIRY` — presigned URL lifetime in seconds (default `3600`)
+
+#### Infrastructure
+- `requirements.txt`: added `boto3==1.38.0`
+- Startup banner: prints File Storage status and bucket name
+
+---
+
 ## [1.6.0] - 2026-03-04
 
 ### Added — Phase 6: Communication & Events

@@ -34,3 +34,5 @@ opentelemetry-instrumentation-fastapi==0.51b0
 opentelemetry-instrumentation-sqlalchemy==0.51b0
 opentelemetry-exporter-otlp-proto-http==1.30.0
 sentry-sdk[fastapi]==2.24.1
+# Phase 7: S3-compatible file storage
+boto3==1.38.0
