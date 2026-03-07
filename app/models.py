@@ -216,3 +216,21 @@ class WebhookDelivery(Base):
     attempted_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     webhook = relationship("Webhook", back_populates="deliveries")
+
+
+# ── Phase 7: File Storage ─────────────────────────────────────────────────────
+
+class StoredFile(Base):
+    """Metadata for a user-uploaded file stored in S3-compatible object storage."""
+    __tablename__ = "stored_files"
+
+    id            = Column(UUID(as_uuid=True), primary_key=True, default=uuid_module.uuid4)
+    user_id       = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    filename      = Column(String(255), nullable=False)
+    content_type  = Column(String(100), nullable=True)
+    size_bytes    = Column(Integer, nullable=False)
+    s3_key        = Column(String(1024), nullable=False)
+    thumbnail_key = Column(String(1024), nullable=True)
+    created_at    = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    user = relationship("User", backref="stored_files")

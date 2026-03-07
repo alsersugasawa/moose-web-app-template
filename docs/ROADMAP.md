@@ -77,24 +77,24 @@ Build out messaging and integration capabilities.
 
 ---
 
-## Phase 7 — File Storage
+## ✅ Phase 7 — File Storage
 
 Add managed file and asset handling.
 
-- [ ] **S3-compatible storage** — Store user-uploaded files in S3 / MinIO / Cloudflare R2 with presigned URL generation
-- [ ] **Image processing** — Automatic resize and thumbnail generation on upload via `Pillow`
-- [ ] **File management UI** — Admin portal view for browsing, downloading, and deleting stored files
+- [x] **S3-compatible storage** — Store user-uploaded files in S3 / MinIO / Cloudflare R2 with presigned URL generation
+- [x] **Image processing** — Automatic resize and thumbnail generation on upload via `Pillow`
+- [x] **File management UI** — Admin portal view for browsing, downloading, and deleting stored files
 
 ---
 
-## Phase 8 — Frontend & UX
+## ✅ Phase 8 — Frontend & UX
 
 Modernize and expand the frontend options.
 
-- [ ] **SPA starter option** — Provide an opt-in React (Vite) or SvelteKit frontend that consumes the existing REST API
-- [ ] **Internationalization (i18n)** — String extraction, locale detection, and language-switching UI
-- [ ] **Accessibility audit** — Bring all pages to WCAG 2.1 AA compliance; add keyboard navigation and screen-reader support
-- [ ] **Progressive Web App (PWA)** — Add a service worker and web manifest so the app can be installed and used offline
+- [x] **SPA starter option** — React (Vite) frontend in `frontend/` with routing, auth context, i18next, and API client; dev-server proxy to FastAPI
+- [x] **Internationalization (i18n)** — `static/i18n.js` module with locale detection, `data-i18n` DOM attributes, and locale files for English, Spanish, and French; SPA uses react-i18next sharing the same locale files; language-switching UI on login and dashboard
+- [x] **Accessibility audit** — Skip navigation links, ARIA landmarks (`role="main"`, `role="banner"`, `role="navigation"`), `aria-live` regions on all error/success messages, `aria-required` on required fields, `autocomplete` attributes, `novalidate` + custom validation on forms across all pages
+- [x] **Progressive Web App (PWA)** — `static/manifest.json` with shortcuts and icons; `static/service-worker.js` with cache-first (static) + network-first (API) strategies; service worker registered on all pages
 
 ---
 

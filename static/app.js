@@ -12,6 +12,9 @@ const API_BASE = '/api';
 // ─── Initialization ───────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', async () => {
+    // Phase 8: initialise i18n before rendering any content
+    if (typeof I18n !== 'undefined') await I18n.init();
+
     // On first deployment, redirect to the setup wizard before anything else
     try {
         const firstRunRes = await fetch(`${API_BASE}/admin/check-first-run`);
@@ -870,6 +873,10 @@ async function handleProfileUpdate(event) {
             const usernameEl = document.getElementById('username-display');
             if (usernameEl) {
                 usernameEl.textContent = data.display_name || currentUser.username;
+            }
+            // Phase 8: re-apply i18n if language changed
+            if (typeof I18n !== 'undefined' && body.language && body.language !== I18n.locale) {
+                await I18n.setLocale(body.language);
             }
         } else {
             msgEl.className = 'text-danger small mb-2';

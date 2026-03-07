@@ -19,6 +19,7 @@ from app.routers import websocket as websocket_router
 from app.routers import health as health_router        # Phase 5
 from app.routers import notifications as notifications_router  # Phase 6
 from app.routers import webhooks as webhooks_router            # Phase 6
+from app.routers import files as files_router                  # Phase 7
 from app.auth import get_secret_key, get_current_admin_user
 from app.security import (
     SecurityHeadersMiddleware,
@@ -152,6 +153,7 @@ async def lifespan(app: FastAPI):
     print(f"OpenTelemetry Tracing:        {'ENABLED → ' + settings.otel_endpoint if settings.otel_enabled and settings.otel_endpoint else 'DISABLED'}")
     print(f"Sentry Error Tracking:        {'ENABLED' if settings.sentry_dsn else 'DISABLED'}")
     print(f"Auto Migration Runner:        {'ENABLED' if settings.auto_migrate else 'DISABLED'}")
+    print(f"File Storage (S3):            {'ENABLED bucket=' + settings.storage_bucket if settings.storage_bucket else 'DISABLED (STORAGE_BUCKET not set)'}")
     print("=" * 70)
 
     yield
@@ -219,6 +221,8 @@ app.include_router(feature_flags_router.router)
 app.include_router(websocket_router.router)        # Phase 4
 app.include_router(notifications_router.router)    # Phase 6
 app.include_router(webhooks_router.router)         # Phase 6
+app.include_router(files_router.router)            # Phase 7
+app.include_router(files_router.admin_router)      # Phase 7
 
 # Phase 3: Plugin auto-loader
 load_plugins(app)

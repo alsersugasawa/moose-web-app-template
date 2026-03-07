@@ -1,0 +1,60 @@
+{
+  "skip_to_content": "Aller au contenu principal",
+
+  "login": "Se connecter",
+  "login_to_admin": "Connexion au portail d'administration",
+  "register": "S'inscrire",
+  "username": "Nom d'utilisateur",
+  "password": "Mot de passe",
+  "email": "Adresse e-mail",
+  "logout": "Se déconnecter",
+  "close": "Fermer",
+
+  "forgot_password": "Mot de passe oublié ?",
+  "dont_have_account": "Vous n'avez pas de compte ?",
+  "register_here": "S'inscrire ici",
+  "already_have_account": "Vous avez déjà un compte ?",
+  "login_here": "Se connecter ici",
+  "back_to_login": "Retour à la connexion",
+  "send_reset_link": "Envoyer le lien de réinitialisation",
+  "reset_password": "Réinitialiser le mot de passe",
+
+  "two_factor_auth": "Authentification à deux facteurs",
+  "totp_instructions": "Entrez le code à 6 chiffres de votre application d'authentification.",
+  "verify": "Vérifier",
+
+  "forgot_password_title": "Mot de passe oublié",
+  "forgot_password_instructions": "Entrez votre e-mail et nous vous enverrons un lien de réinitialisation.",
+
+  "welcome": "Bienvenue sur votre tableau de bord",
+  "welcome_subtitle": "Ceci est un modèle de plateforme web générique. Remplacez ce contenu par les fonctionnalités de votre application.",
+
+  "account_security": "Sécurité du compte",
+  "two_factor_authentication": "Authentification à deux facteurs (TOTP)",
+  "not_set_up": "Non configuré",
+  "set_up_2fa": "Configurer 2FA",
+  "disable_2fa": "Désactiver 2FA",
+  "active_sessions": "Sessions actives",
+  "api_keys": "Clés API",
+  "new_key": "Nouvelle clé",
+
+  "my_profile": "Mon profil",
+  "change_avatar": "Changer l'avatar",
+  "display_name": "Nom affiché",
+  "bio": "Biographie",
+  "timezone": "Fuseau horaire",
+  "language": "Langue",
+  "save_profile": "Enregistrer le profil",
+
+  "dashboard": "Tableau de bord",
+  "users": "Utilisateurs",
+  "logs": "Journaux",
+  "backups": "Sauvegardes",
+  "certificates": "Certificats",
+  "invitations": "Invitations",
+  "feature_flags": "Indicateurs de fonctionnalités",
+  "files": "Fichiers",
+  "developer_tools": "Outils développeur",
+  "my_account": "Mon compte",
+  "about": "À propos"
+}
